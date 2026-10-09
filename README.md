@@ -95,6 +95,18 @@ A health check at `GET /api/health` reports whether the database is reachable. T
 - **Business model.** ₹499 per learner per month. The challenges run in the browser at near-zero marginal cost.
 - **12-month plan.** Role packs (App Dev, Backend, QA, DevOps, Customer Success) as new content on the same engines; scenarios written from a company's own situations; manager dashboards for skill growth; integration with digital adoption platforms such as Apty.
 
+**Unit economics (estimates, to be checked in the pilot).** Assumes a company plan of 50 learners and about 1,000 learners in total in year one.
+
+| Per learner, per month | Amount | How we got it |
+|---|---|---|
+| Price | ₹499 | Proposed subscription |
+| Hosting | about ₹5 | One small server and a managed PostgreSQL database (about ₹5,000 a month) shared by about 1,000 learners; the games run in the learner's browser |
+| Content | about ₹17 | About ₹2,00,000 a year to write and review new scenarios and challenges, spread over about 1,000 learners |
+| Support and onboarding | about ₹25 | Part-time help for company admins |
+| **Gross margin** | **about ₹450 (about 90%)** | Price minus the costs above |
+| Cost to win a customer | about ₹15,000 per company (about ₹300 per learner) | A pilot, a demo and a few follow-up calls |
+| Payback | under 1 month | ₹300 acquisition cost against about ₹450 margin per learner per month |
+
 | Business model canvas | |
 |---|---|
 | Customers | L&D teams, engineering managers, colleges and bootcamps |
@@ -108,7 +120,17 @@ A health check at `GET /api/health` reports whether the database is reachable. T
 
 ## 6. Team
 
-Vivek, Prem, Lalitha Akhila, Margarida, Sonali, Deepak Dara. *(Add each person's role.)*
+| Member | Contributions |
+|---|---|
+| Tarun (tarun-apty) | Core app: Soft and Technical Skills engines, interactive lessons, PostgreSQL accounts and progress, security hardening, tests and CI, settings; reviewed and merged pull requests |
+| Vivek (VivekMethuku-PI) | Mini games arcade, achievements, dynamic Bubble Sort lab |
+| Deepak Dara (daradeepak) | Repository owner; first version of the app |
+| Sonali (Sonali-b23) | Combined the team's versions, repository clean-up, README, polish and QA |
+| Prem | *To be filled in by the team* |
+| Lalitha Akhila | *To be filled in by the team* |
+| Margarida | *To be filled in by the team* |
+
+Commits from the "Apty Admin" account (Reverse String and Binary Search visualisers, polish and QA fixes) belong to a team member; the team should name them here.
 
 ## 7. Credits and licences
 
