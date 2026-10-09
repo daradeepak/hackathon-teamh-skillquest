@@ -1,0 +1,12 @@
+# Local account database (created by server.js; contains password hashes)
+skillquest/data/accounts.json
+skillquest/data/*.tmp
+
+# Secrets
+.env
+.env.*
+
+# OS and tooling
+.DS_Store
+node_modules/
+.vercel/
