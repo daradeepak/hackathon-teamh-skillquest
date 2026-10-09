@@ -18,10 +18,11 @@
     { speaker: "Pip 🦊 · Client call", text: "A client is upset about a missed deadline and starts raising their voice. What happens first?", options: ["Stay calm, acknowledge their frustration, and say what you’ll do next.", "Explain all the reasons it wasn’t your fault.", "End the call until they calm down."], points: [2, 1, 0], feedback: ["Yes. Acknowledging feelings first lowers the temperature, and a clear next step rebuilds trust.", "Explanations can sound like excuses before the person feels heard.", "Ending the call can make a bad moment worse. Stay steady and keep it constructive."] }
   ];
   function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) } }; }
+  var AVATAR_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
   function fresh() { return { choice: null, lines: [], order: [], pairs: {}, pending: null, fill: [], code: "", busy: false, result: null }; }
   function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
   function blankProgress(name) {
-    return { name: name || "Learner", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, daily: { date: dayKey(), actions: [], claimed: false },
+    return { name: name || "Learner", avatar: "", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, daily: { date: dayKey(), actions: [], claimed: false },
       reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 } };
   }
   /* Accepts saved progress from this or an older version and keeps only values that are still valid. */
@@ -36,7 +37,7 @@
     if (p.tech && typeof p.tech === "object") Object.keys(p.tech).forEach(function(id) {
       var v = Number(p.tech[id]); if (CHAL_BY_ID[id] && isFinite(v) && v > 0) tech[id] = Math.min(100, Math.round(v));
     });
-    return Object.assign(base, { tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
+    return Object.assign(base, { avatar: AVATAR_RE.test(p.avatar) ? p.avatar : "", tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
       reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}) });
   }
   function seed() { return blankProgress("Learner"); }
@@ -49,6 +50,22 @@
   function accountInitials(name) {
     return String(name || "Learner").trim().split(/\s+/).slice(0, 2).map(function(part) { return part.charAt(0); }).join("").toUpperCase() || "L";
   }
+  function paintAvatar(node, initials, photo) {
+    node.textContent = initials;
+    if (photo && AVATAR_RE.test(photo)) { node.style.backgroundImage = 'url("' + photo + '")'; node.classList.add("has-photo"); }
+    else { node.style.backgroundImage = ""; node.classList.remove("has-photo"); }
+  }
+  function currentTheme() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
+  function syncThemeUi() {
+    var dark = currentTheme() === "dark", button = document.getElementById("theme-toggle"), meta = document.querySelector('meta[name="theme-color"]');
+    if (button) { button.textContent = dark ? "☀️" : "🌙"; button.setAttribute("aria-pressed", String(dark)); button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode"); button.title = dark ? "Switch to light mode" : "Switch to dark mode"; }
+    if (meta) meta.setAttribute("content", dark ? "#14161c" : "#f3f3ee");
+  }
+  function setTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("xpaddition-theme", theme); } catch (e) {}
+    syncThemeUi();
+  }
   function syncAccountUi() {
     var name = account ? account.name : state.name;
     var avatar = accountInitials(name);
@@ -57,13 +74,13 @@
     var toggle = document.getElementById("account-toggle");
     if (profileName) profileName.textContent = name;
     if (profileSubtitle) profileSubtitle.textContent = (account ? "Local account · " : "Guest · ") + "Level " + currentLevel() + " · " + playerLevel().name;
-    if (profileAvatar) profileAvatar.textContent = avatar;
-    if (topAvatar) topAvatar.textContent = avatar;
+    var photo = account ? account.avatar : state.avatar;
+    [profileAvatar, topAvatar].forEach(function(node) { if (node) paintAvatar(node, avatar, photo); });
     if (toggle) { toggle.textContent = account ? "Account · " + account.name : "Sign in / create account"; toggle.setAttribute("aria-label", account ? "Manage account" : "Sign in or create an account"); }
   }
   function normalizedProgress(progress, name) { return normalize(progress, name); }
   async function activateAccount(user) {
-    account = { id: user.id, name: user.name, email: user.email };
+    account = { id: user.id, name: user.name, email: user.email, avatar: AVATAR_RE.test(user.avatar) ? user.avatar : "" };
     KEY = BASE_KEY + ":account:" + account.id;
     var cached = null;
     try { cached = normalizedProgress(JSON.parse(localStorage.getItem(KEY)), account.name); } catch (e) {}
@@ -86,12 +103,77 @@
     var modal = document.getElementById("account-modal-root");
     if (!modal) return;
     if (account) {
-      modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">YOUR PLAYER CARD</span><h2 id="account-title">Hey, ' + esc(account.name) + '!</h2><p class="account-intro">Your quests and XP are saved to this local SkillQuest account.</p><div class="account-profile-card"><strong>' + esc(account.name) + '</strong><span>' + esc(account.email) + '</span><small>Level ' + currentLevel() + ' · ' + state.xp + ' XP</small></div><button class="account-submit" data-action="account-logout">Sign out</button><p class="account-local-note">Demo account · saved on this computer</p></section></div>';
+      modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">YOUR PLAYER CARD</span><h2 id="account-title">Hey, ' + esc(account.name) + '!</h2><p class="account-intro">Your quests and XP are saved to this local XPaddition account.</p><div class="account-profile-card"><strong>' + esc(account.name) + '</strong><span>' + esc(account.email) + '</span><small>Level ' + currentLevel() + ' · ' + state.xp + ' XP</small></div><button class="account-submit" data-action="account-logout">Sign out</button><p class="account-local-note">Demo account · saved on this computer</p></section></div>';
       return;
     }
     var signup = accountMode === "signup";
     modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">PLAYER LOGIN</span><h2 id="account-title">' + (signup ? "Make your player card" : "Welcome back, player!") + '</h2><p class="account-intro">' + (signup ? "Save your quests, XP and level as you play." : "Pick up your quests right where you left off.") + '</p><div class="account-tabs"><button type="button" data-account-mode="login" class="' + (!signup ? "active" : "") + '">Sign in</button><button type="button" data-account-mode="signup" class="' + (signup ? "active" : "") + '">Create account</button></div><form id="account-form" data-mode="' + (signup ? "signup" : "login") + '">' + (signup ? '<label class="account-field">Your name<input name="name" type="text" minlength="2" maxlength="40" autocomplete="name" required placeholder="e.g. Sam Rivera"></label>' : '') + '<label class="account-field">Email address<input name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"></label><label class="account-field">Password<input name="password" type="password" minlength="8" maxlength="128" autocomplete="' + (signup ? "new-password" : "current-password") + '" required placeholder="At least 8 characters"></label><p id="account-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">' + (signup ? "Create my account →" : "Let's play →") + '</button></form><p class="account-local-note">Local demo only. Use a made-up password; nothing is emailed.</p></section></div>';
     var firstField = modal.querySelector("input"); if (firstField) firstField.focus();
+  }
+  var profileDraft = null;
+  function shrinkPhoto(file) {
+    return new Promise(function(resolve, reject) {
+      if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) { reject(new Error("Choose a PNG, JPEG, WebP or GIF image.")); return; }
+      if (file.size > 8 * 1024 * 1024) { reject(new Error("That photo is too large. Pick one under 8 MB.")); return; }
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function() {
+        URL.revokeObjectURL(url);
+        var size = 160, canvas = document.createElement("canvas"), ctx = canvas.getContext("2d"), side = Math.min(img.width, img.height);
+        canvas.width = canvas.height = size; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = function() { URL.revokeObjectURL(url); reject(new Error("We couldn’t read that image.")); };
+      img.src = url;
+    });
+  }
+  function profilePreview() {
+    var node = document.getElementById("profile-preview");
+    if (node && profileDraft) paintAvatar(node, accountInitials(profileDraft.name), profileDraft.avatar);
+  }
+  function renderProfileModal() {
+    var modal = document.getElementById("account-modal-root"); if (!modal) return;
+    profileDraft = { name: account ? account.name : state.name, avatar: account ? account.avatar : state.avatar };
+    modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><span class="account-kicker">YOUR PROFILE</span><h2 id="profile-title">Make it yours</h2>' +
+      '<form id="profile-form"><div class="profile-photo-row"><span class="profile-photo" id="profile-preview" aria-hidden="true"></span><div class="profile-photo-actions"><button type="button" data-action="profile-photo">Upload photo</button><button type="button" data-action="profile-photo-remove">Remove photo</button></div><input class="profile-hidden-input" id="profile-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" aria-label="Upload a profile photo"></div>' +
+      '<label class="account-field">Display name<input name="name" id="profile-name-input" type="text" minlength="2" maxlength="40" required autocomplete="name" value="' + esc(profileDraft.name) + '"></label><p id="profile-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">Save profile</button></form>' +
+      (account ? '<button class="account-secondary" data-action="account-logout">Sign out</button><p class="profile-note">Signed in as ' + esc(account.email) + '. Your name and photo show on the leaderboard.</p>' : '<button class="account-secondary" data-action="account">Sign in / create account</button><p class="profile-note">You’re playing as a guest. This profile stays on this device until you sign in.</p>') + '</section></div>';
+    profilePreview();
+    var field = document.getElementById("profile-name-input"); if (field) field.focus();
+  }
+  async function submitProfile(form) {
+    var button = form.querySelector("[type=submit]"), error = document.getElementById("profile-error");
+    var name = String(new FormData(form).get("name") || "").trim().replace(/\s+/g, " ").slice(0, 40);
+    if (name.length < 2) { error.textContent = "Use a name with at least 2 characters."; return; }
+    error.textContent = ""; button.disabled = true; button.textContent = "Saving…";
+    try {
+      if (account) {
+        var response = await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ name: name, avatar: profileDraft.avatar || "" }) });
+        var result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not save your profile.");
+        account.name = result.user.name; account.avatar = AVATAR_RE.test(result.user.avatar) ? result.user.avatar : ""; state.name = account.name;
+      } else { state.name = name; state.avatar = profileDraft.avatar || ""; }
+      save(); closeAccountModal(); syncAccountUi(); draw(); say("Profile saved!");
+    } catch (problem) { error.textContent = problem.message || "Could not save your profile."; button.disabled = false; button.textContent = "Save profile"; }
+  }
+  var lbToken = 0;
+  function leaderboardPage() {
+    var token = ++lbToken;
+    root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Scoreboard keeps your personal stats.</p></div></section><p class="lb-note" role="status">Loading the rankings…</p></div>';
+    fetch("/api/leaderboard", { headers: { "Accept": "application/json" } }).then(function(r) { if (!r.ok) throw new Error(); return r.json(); }).then(function(data) {
+      if (token !== lbToken || view !== "leaderboard") return;
+      var rows = data.players.map(function(p) {
+        var photo = AVATAR_RE.test(p.avatar) ? ' has-photo" style="background-image:url(\'' + p.avatar + '\')' : "";
+        var lvl = levelInfo(p.xp, PLAYER_AT);
+        return '<li class="lb-row' + (p.me ? " me" : "") + '"><span class="lb-rank">' + (p.rank <= 3 ? ["🥇", "🥈", "🥉"][p.rank - 1] : "#" + p.rank) + '</span><span class="lb-photo' + photo + '">' + esc(accountInitials(p.name)) + '</span><span class="lb-name"><span>' + esc(p.name) + (p.me ? '<span class="lb-you">YOU</span>' : "") + '</span><small>Level ' + lvl.n + ' · ' + esc(PLAYER_LEVELS[lvl.n - 1][0]) + '</small></span><span class="lb-xp">' + p.xp + ' XP</span></li>';
+      }).join("");
+      var body = data.players.length ? '<ol class="lb-list">' + rows + '</ol>' : '<div class="lb-list"><p class="lb-empty">No players yet. Create an account to be the first on the board.</p></div>';
+      var foot = account ? '<p class="lb-note">Showing the top players plus you. ' + data.total + ' registered in total. Rankings use the XP saved to each account.</p>' : '<p class="lb-note">Sign in or create an account to appear on the leaderboard. <button class="dev-link" data-action="account">Sign in →</button></p>';
+      root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Scoreboard keeps your personal stats.</p></div></section>' + body + foot + '</div>';
+    }).catch(function() {
+      if (token !== lbToken || view !== "leaderboard") return;
+      root.querySelector(".lb-note").textContent = "The leaderboard needs the XPaddition server. Start it with start-localhost.bat and refresh.";
+    });
   }
   async function submitAccount(form) {
     var button = form.querySelector("[type=submit]"), error = document.getElementById("account-error");
@@ -168,11 +250,12 @@
     current = id; view = "game"; session = fresh();
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
+  var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges", "anim", "sort"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
   function go(where) { if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function draw() {
     if (view === "home") { label.textContent = "Home"; home(); if (LAB_ENABLED) root.insertAdjacentHTML("afterbegin", dailyBanner()); }
-    else if (view === "map") { label.textContent = "Skills"; track === "tech" ? techMap() : map(); }
+    else if (view === "map") { label.textContent = "Game Map"; track === "tech" ? techMap() : map(); }
+    else if (view === "leaderboard") { label.textContent = "Leaderboard"; leaderboardPage(); }
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
     else if (view === "anim") { label.textContent = "Play Lab"; animatedPage(); }
@@ -209,7 +292,7 @@
   }
   function capabilityPage(tab, description, cards, cta, note) {
     var pl = playerLevel();
-    return '<div class="sk"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Skills</h1><p>' + description + '</p></div>' + trackTabs(tab) + '</section>' +
+    return '<div class="sk"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Game Map</h1><p>' + description + '</p></div>' + trackTabs(tab) + '</section>' +
       '<section class="sk-player"><div class="sk-player-level"><span class="sk-eyebrow">PLAYER LEVEL</span><strong>' + pl.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>Level ' + pl.n + ' — ' + esc(pl.name) + '</h2><span>' + state.xp + (pl.next === null ? " XP" : " / " + pl.next + " XP") + '</span></div>' +
       '<div class="sk-bar" role="progressbar" aria-label="Progress to the next player level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pl.pct + '"><i style="width:' + pl.pct + '%"></i></div><p>' + esc(pl.blurb) + '</p></div></section>' +
       '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">INDIVIDUAL PROGRESSION</span><h2>' + (tab === "tech" ? "Technical Skill Levels" : "Skill Levels") + '</h2></div><button class="primary-button" data-action="' + cta[0] + '">' + cta[1] + '</button></div><div class="sk-grid">' + cards + '</div><p class="sk-note">' + note + '</p></section></div>';
@@ -363,7 +446,7 @@
       '<div class="sk-gains">' + (r.first ? gainChips(r.gains) : '<span class="sk-chip sk-chip-muted">Practice run · no extra XP</span>') + '</div>' +
       (r.levelUps.length ? '<ul class="sk-levelups">' + r.levelUps.map(function(t) { return '<li>🎉 ' + esc(t) + '</li>'; }).join("") + '</ul>' : "") +
       '<details class="sk-others"><summary>See what the other approaches build</summary><ul>' + sc.options.map(function(x, i) { return '<li><b>' + String.fromCharCode(65 + i) + '</b><span>' + esc(x.text) + (i === r.choice ? ' <em>(your choice)</em>' : '') + '</span><span class="sk-gains">' + gainChips(x.xp) + '</span></li>'; }).join("") + '</ul></details>' +
-      '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue">Next scenario →</button><button type="button" class="secondary-button" data-action="replay">Try a different approach</button><button type="button" class="secondary-button" data-nav="map">Back to Skills</button></div></div>';
+      '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue">Next scenario →</button><button type="button" class="secondary-button" data-action="replay">Try a different approach</button><button type="button" class="secondary-button" data-nav="map">Back to Game Map</button></div></div>';
   }
   function codeBlock(lines) { return '<pre class="sk-code"><code>' + esc(lines.join("\n")) + '</code></pre>'; }
   function normAnswer(x) { return String(x == null ? "" : x).trim().replace(/\s+/g, " ").toLowerCase(); }
@@ -500,10 +583,10 @@
       (ans ? '<p class="sk-chosen"><b>Answer:</b> ' + esc(ans) + '</p>' : "") + '<div class="sk-insight"><span class="sk-eyebrow">WHY</span><p>' + esc(c.explain) + '</p></div>' +
       '<div class="sk-gains">' + (r.gain > 0 ? '<span class="sk-chip">+' + r.gain + ' ' + esc(SKILL_BY_ID[c.skill].name) + '</span>' : '<span class="sk-chip sk-chip-muted">' + (r.score >= r.best ? "No new XP · best score " + r.best + "%" : "Best score stays " + r.best + "%") + '</span>') + '</div>' +
       (r.levelUps.length ? '<ul class="sk-levelups">' + r.levelUps.map(function(t) { return '<li>🎉 ' + esc(t) + '</li>'; }).join("") + '</ul>' : "") +
-      '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue-tech">Next challenge →</button><button type="button" class="secondary-button" data-action="replay">Try again</button><button type="button" class="secondary-button" data-nav="map">Back to Skills</button></div></div>';
+      '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue-tech">Next challenge →</button><button type="button" class="secondary-button" data-action="replay">Try again</button><button type="button" class="secondary-button" data-nav="map">Back to Game Map</button></div></div>';
   }
   function techScreen(c) {
-    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Skills</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · CHALLENGE</span><h1>' + c.emoji + ' ' + esc(c.title) + '</h1><p class="sk-situation">' + esc(c.prompt) + '</p>' +
+    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Game Map</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · CHALLENGE</span><h1>' + c.emoji + ' ' + esc(c.title) + '</h1><p class="sk-situation">' + esc(c.prompt) + '</p>' +
       (session.result ? techResult(c) : techBody(c) + '<div class="sk-actions"><button type="button" class="primary-button" data-action="submit"' + (techReady(c) ? "" : " disabled") + '>Lock it in →</button>' + (c.kind === "arrange" && session.order.length ? '<button type="button" class="secondary-button" data-action="clear-order">Clear</button>' : "") + '</div>') + '</section></div>';
     if (c.kind === "live" && !session.result) setupLive(c);
   }
@@ -542,7 +625,7 @@
     if (CHAL_BY_ID[current]) { techScreen(CHAL_BY_ID[current]); return; }
     var sc = SCEN_BY_ID[current];
     if (!sc) { go("map"); return; }
-    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Skills</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[sc.skill].name.toUpperCase()) + ' · SCENARIO</span><h1>' + esc(sc.title) + '</h1><p class="sk-situation">' + esc(sc.situation) + '</p><h2 class="sk-question">' + esc(sc.question) + '</h2>' + (session.result ? resultCard(sc) : choiceCard(sc)) + '</section></div>';
+    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Game Map</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[sc.skill].name.toUpperCase()) + ' · SCENARIO</span><h1>' + esc(sc.title) + '</h1><p class="sk-situation">' + esc(sc.situation) + '</p><h2 class="sk-question">' + esc(sc.question) + '</h2>' + (session.result ? resultCard(sc) : choiceCard(sc)) + '</section></div>';
   }
   function submit() {
     if (CHAL_BY_ID[current]) { techSubmit(CHAL_BY_ID[current]); return; }
@@ -575,6 +658,8 @@
   }
 
   document.addEventListener("click", function(e) {
+    var brandLink = e.target.closest(".brand");
+    if (brandLink) { var logo = brandLink.querySelector(".xp-logo"); if (logo) { logo.classList.remove("pop"); void logo.offsetWidth; logo.classList.add("pop"); setTimeout(function() { logo.classList.remove("pop"); }, 650); } }
     var accountModeButton = e.target.closest("[data-account-mode]");
     if (accountModeButton) { renderAccountModal(accountModeButton.dataset.accountMode); return; }
     if (e.target.id === "account-modal-root" || e.target.classList.contains("account-backdrop")) { closeAccountModal(); return; }
@@ -591,7 +676,11 @@
     var skillButton = e.target.closest("[data-skill]");
     if (skillButton) { open(nextScenario(skillButton.dataset.skill)); return; }
     var actionButton = e.target.closest("[data-action]"), action = actionButton && actionButton.dataset.action;
-    if (action === "account") renderAccountModal(account ? "account" : "login");
+    if (action === "theme") setTheme(currentTheme() === "dark" ? "light" : "dark");
+    else if (action === "profile") renderProfileModal();
+    else if (action === "profile-photo") { var fileInput = document.getElementById("profile-file"); if (fileInput) fileInput.click(); }
+    else if (action === "profile-photo-remove") { if (profileDraft) { profileDraft.avatar = ""; profilePreview(); } }
+    else if (action === "account") renderAccountModal(account ? "account" : "login");
     else if (action === "close-account") closeAccountModal();
     else if (action === "account-logout") signOut();
     else if (action === "continue") open(nextScenario());
@@ -640,13 +729,22 @@
       if (c && submitButton) submitButton.disabled = !techReady(c);
     }
   });
+  document.addEventListener("change", function(e) {
+    if (e.target.id !== "profile-file" || !e.target.files || !e.target.files[0] || !profileDraft) return;
+    var error = document.getElementById("profile-error");
+    shrinkPhoto(e.target.files[0]).then(function(url) { profileDraft.avatar = url; if (error) error.textContent = ""; profilePreview(); }).catch(function(problem) { if (error) error.textContent = problem.message; });
+    e.target.value = "";
+  });
   document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && document.querySelector(".account-backdrop")) { closeAccountModal(); return; }
     if (e.key === "Enter" && e.target.classList && e.target.classList.contains("sk-blank")) { var c = CHAL_BY_ID[current]; if (c && techReady(c)) techSubmit(c); }
   });
   document.addEventListener("submit", function(e) {
     if (e.target.id === "account-form") { e.preventDefault(); submitAccount(e.target); }
+    if (e.target.id === "profile-form") { e.preventDefault(); submitProfile(e.target); }
   });
   draw();
+  syncThemeUi();
   syncAccountUi();
   initAccount();
 })(); 

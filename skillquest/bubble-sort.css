@@ -11,7 +11,7 @@
     repeating-linear-gradient(60deg, transparent 0 38px, rgba(255, 255, 255, .025) 38px 39px),
     repeating-linear-gradient(-60deg, transparent 0 38px, rgba(255, 255, 255, .025) 38px 39px); }
 .bs-header { text-align: center; padding: 26px 24px 0; position: relative; z-index: 2; }
-.bs-title { margin: 0; font: 800 25px/1.2 Manrope, 'DM Sans', sans-serif; letter-spacing: .5px; color: var(--bs-text); }
+.bs-title { margin: 0; font: 800 25px/1.2 Fredoka, Nunito, sans-serif; letter-spacing: .5px; color: var(--bs-text); }
 .bs-sub { color: var(--bs-muted); font-size: 12px; line-height: 1.5; margin: 8px auto 12px; max-width: 300px; }
 .bs-pills { display: flex; gap: 10px; justify-content: center; }
 .bs-pill { font: 600 10px/1 ui-monospace, Menlo, monospace; padding: 6px 10px; border-radius: 99px; border: 1px solid; }
@@ -66,7 +66,7 @@
 .bs-row { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; }
 .bs-seek { width: 100%; accent-color: var(--coral, #f47b67); }
 .bs-play { min-width: 92px; justify-content: center; }
-.bs-select, .bs-input { font: 600 12px 'DM Sans', system-ui, sans-serif; background: #fff; color: var(--ink, #20343c); border: 1px solid #e6e8e2; border-radius: 12px; padding: 9px 12px; }
+.bs-select, .bs-input { font: 600 12px Nunito, system-ui, sans-serif; background: #fff; color: var(--ink, #20343c); border: 1px solid #e6e8e2; border-radius: 12px; padding: 9px 12px; }
 .bs-input { width: 170px; font-weight: 500; }
 .bs-input[aria-invalid="true"] { border-color: #d6453d; }
 .bs-select:focus-visible, .bs-input:focus-visible, .bs-seek:focus-visible { outline: 3px solid #a79aff; outline-offset: 2px; }

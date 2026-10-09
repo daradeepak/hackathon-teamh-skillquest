@@ -1,4 +1,4 @@
-# SkillQuest — soft-skills learning game
+# XPaddition — soft skills and technical skills game
 
 A playful, dependency-free prototype. Players practise short workplace scenarios, collect XP, and unlock a challenge at the end of each level.
 
@@ -13,8 +13,11 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 
 ## What is playable
 
-- Skills (sidebar) has two tabs. **Soft Skills** is a capability map with a player level and six individual skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). Its scenarios have no right or wrong answers: the approach a player chooses awards XP to the skills it shows, and the first choice per scenario counts. **Technical Skills** covers HTML, CSS and JavaScript with 12 interactive challenges: a live CSS editor with a preview and goal checklist, a JavaScript editor that runs tests in a time-limited Web Worker, type-in blanks, matching pairs, putting pieces in order, and tapping buggy lines. Score 60% or more to clear a challenge; improving your best score earns the rest of its XP.
-- Play Lab (sidebar) holds animated walkthroughs. DSA → Bubble Sort is a 3D step-by-step visualizer with play, pause, step, scrub, speed control and custom arrays. Watching every step earns +40 XP and the Sort Sprinter badge once.
+- Game Map (sidebar) has two tabs. **Soft Skills** is a capability map with a player level and six individual skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). Its scenarios have no right or wrong answers: the approach a player chooses awards XP to the skills it shows, and the first choice per scenario counts. **Technical Skills** covers HTML, CSS and JavaScript with 12 interactive challenges: a live CSS editor with a preview and goal checklist, a JavaScript editor that runs tests in a time-limited Web Worker, type-in blanks, matching pairs, putting pieces in order, and tapping buggy lines. Score 60% or more to clear a challenge; improving your best score earns the rest of its XP.
+- Leaderboard (sidebar) ranks registered players by XP and highlights you. Scoreboard keeps your personal stats.
+- Profile: click your avatar to edit your display name and upload a photo (resized in the browser, saved to your account, or kept on this device as a guest).
+- Light/Dark theme switch in the top bar; the choice is remembered.
+- Play Lab with the Bubble Sort visualizer is hidden for now. Its code stays behind `LAB_ENABLED` in `developer-app.js` with no link in the UI.
 - XP, player levels, a scoreboard, and a sound toggle.
 - Local account registration, sign-in, sign-out, password hashing, and server-backed progress saving.
 - The older lab (daily quest, reels, story and badges; temporarily hidden; set `LAB_ENABLED = true` in `developer-app.js` and restore its sidebar button and home banner to bring it back) adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
@@ -27,7 +30,8 @@ Everything is fictional demo content. Accounts are stored in a local JSON file, 
 - `index.html` — page shell and navigation
 - `style.css` — responsive styling
 - `developer-games.js` — the soft skills and scenarios (options and the XP each awards), plus the technical skills and challenges
-- `skills.css` — styles for the Skills page and scenarios
+- `skills.css` — styles for the Game Map and scenarios
+- `theme.css` — logo animation, dark mode, avatars, leaderboard and profile styles
 - `developer-app.js` — navigation, game rules, feedback, and local progress
 - `bubble-sort.js` and `bubble-sort.css` — the Bubble Sort Lab (styles are scoped under `.bs`)
 - `server.js` and `start-localhost.bat` — local web server and account API

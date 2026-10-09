@@ -1,7 +1,7 @@
 /* Soft Skills page and scenarios. Scoped under .sk so it cannot affect the rest of the app. */
 .sk { --sk-blue: #2f5fd0; --sk-blue-soft: #e8eefc; --sk-ink: #172033; --sk-muted: #667085; --sk-line: #dde2ec; --sk-track: #e4e8f0; --sk-card: #fbfcff;
   max-width: 1080px; margin: 0 auto; color: var(--sk-ink); }
-.sk h1, .sk h2 { font-family: Manrope, 'DM Sans', sans-serif; letter-spacing: -.3px; margin: 0; }
+.sk h1, .sk h2 { font-family: Fredoka, Nunito, sans-serif; letter-spacing: -.3px; margin: 0; }
 .sk-eyebrow { display: block; color: var(--sk-blue); font-size: 10px; font-weight: 800; letter-spacing: 1.6px; }
 .sk-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding: 6px 0 22px; }
 .sk-head h1 { font-size: 30px; margin-top: 6px; }
@@ -9,7 +9,7 @@
 
 .sk-player { display: flex; gap: 22px; align-items: center; padding: 22px 0; border-top: 1px solid var(--sk-line); border-bottom: 1px solid var(--sk-line); }
 .sk-player-level { min-width: 108px; padding-right: 22px; border-right: 1px solid var(--sk-line); }
-.sk-player-level strong { display: block; margin-top: 8px; color: var(--sk-blue); font: 800 44px/1 Manrope, sans-serif; }
+.sk-player-level strong { display: block; margin-top: 8px; color: var(--sk-blue); font: 800 44px/1 Fredoka, sans-serif; }
 .sk-player-body { flex: 1; min-width: 0; }
 .sk-player-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
 .sk-player-row h2 { font-size: 15px; }
@@ -30,7 +30,7 @@
 .sk-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
 .sk-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: var(--sk-blue-soft); color: var(--sk-blue); }
 .sk-level { color: var(--sk-blue); font-size: 9px; font-weight: 800; letter-spacing: 1.2px; }
-.sk-card strong { font: 700 13px Manrope, sans-serif; }
+.sk-card strong { font: 700 13px Fredoka, sans-serif; }
 .sk-desc { color: var(--sk-muted); font-size: 11.5px; line-height: 1.5; }
 .sk-card-foot { display: flex; justify-content: space-between; margin-top: auto; padding-top: 12px; color: var(--sk-muted); font-size: 9.5px; font-weight: 600; }
 .sk-played { color: #8a93a6; font-size: 9.5px; }
@@ -78,7 +78,7 @@
 .sk-codeline:focus-visible, .sk-tile:focus-visible, .sk-slot:focus-visible { outline: 3px solid #a9bdf2; outline-offset: 1px; }
 .sk-slots, .sk-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .sk-slot { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; min-height: 40px; padding: 8px 12px; border: 1.5px dashed var(--sk-line); border-radius: 8px; background: #fff; color: var(--sk-ink); font: 600 12.5px ui-monospace, Menlo, monospace; }
-.sk-slot b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--sk-blue-soft); color: var(--sk-blue); font: 800 11px 'DM Sans', sans-serif; }
+.sk-slot b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--sk-blue-soft); color: var(--sk-blue); font: 800 11px Nunito, sans-serif; }
 .sk-slot.filled { border-style: solid; border-color: var(--sk-blue); background: #f1f5ff; cursor: pointer; }
 .sk-tile { min-height: 40px; padding: 8px 14px; border: 1px solid var(--sk-line); border-radius: 8px; background: #fff; color: var(--sk-ink); font: 600 12.5px ui-monospace, Menlo, monospace; cursor: pointer; box-shadow: 0 2px 0 var(--sk-line); transition: transform .12s; }
 .sk-tile:hover { transform: translateY(-2px); border-color: #9db3ec; }
