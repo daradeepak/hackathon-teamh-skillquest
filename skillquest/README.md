@@ -1,6 +1,6 @@
-# SkillQuest — developer learning game
+# SkillQuest — soft-skills learning game
 
-A playful, dependency-free prototype based on the SkillQuest build brief. Developers learn to inspect AI-written code by playing short missions, collecting XP, and unlocking boss challenges.
+A playful, dependency-free prototype. Players practise short workplace scenarios, collect XP, and unlock a challenge at the end of each level.
 
 ## Run locally on Windows
 
@@ -13,11 +13,9 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 
 ## What is playable
 
-- Game map has two sections: **Soft Skills** (Developer Core: Read It, Check It, and Direct It & Own It, plus the Choose Your Move workplace story and the AI Engineer teaser) and **DSA** (Bubble Sort, which opens the animated visualizer).
-- A boss challenge unlocks after three games in a level reach an Okay score; clearing a boss opens the next level.
-- Mini-games include code comprehension, tap-the-bug, acceptance-criteria checks, test review, security review, and a scripted pull-request review.
-- The Code Fix boss runs user-edited JavaScript in a time-limited Web Worker.
-- An AI Engineer teaser track includes Hallucination Hunter and Prompt Fix.
+- Soft-skills missions use two engines: pick the best response, and pick every good move. A challenge unlocks after both missions in a level reach an Okay score; passing it opens the next level.
+
+- Game map has two sections: **Soft Skills** (three levels: Say It Clearly, Work Together, Own It. Each has two missions and a challenge, plus the Choose Your Move workplace story) and **DSA** (Bubble Sort, which opens the animated visualizer).
 - Animated → DSA → Bubble Sort: a 3D step-by-step visualizer with play, pause, step, scrub, speed control and custom arrays. Watching every step earns +40 XP and the Sort Sprinter badge once.
 - XP, combos, rematches, the scoreboard, sound toggle, and a mystery-chest reward.
 - Local account registration, sign-in, sign-out, password hashing, and server-backed progress saving.
@@ -30,7 +28,7 @@ Everything is fictional demo content. Accounts are stored in a local JSON file, 
 
 - `index.html` — page shell and navigation
 - `style.css` — responsive styling
-- `developer-games.js` — mission data and levels
+- `developer-games.js` — soft-skills mission data and levels
 - `developer-app.js` — navigation, game rules, feedback, and local progress
 - `bubble-sort.js` and `bubble-sort.css` — the Bubble Sort Lab (styles are scoped under `.bs`)
 - `server.js` and `start-localhost.bat` — local web server and account API

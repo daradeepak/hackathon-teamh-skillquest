@@ -11,17 +11,23 @@
         "name": "Deepak",
         "xp": 0,
         "streak": 0,
-        "combo": 0,
-        "bestCombo": 0,
-        "played": [],
-        "best": {},
+        "combo": 1,
+        "bestCombo": 1,
+        "played": [
+          "active-listening"
+        ],
+        "best": {
+          "active-listening": 100
+        },
         "bosses": [],
         "chests": [],
         "rematchAt": {},
         "sound": false,
         "daily": {
           "date": "2026-10-09",
-          "actions": [],
+          "actions": [
+            "mission"
+          ],
           "claimed": false
         },
         "reels": [],
