@@ -13,11 +13,9 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 
 ## What is playable
 
-- Soft-skills missions use two engines: pick the best response, and pick every good move. A challenge unlocks after both missions in a level reach an Okay score; passing it opens the next level.
-
-- Game map has two sections: **Soft Skills** (three levels: Say It Clearly, Work Together, Own It. Each has two missions and a challenge, plus the Choose Your Move workplace story) and **DSA** (Bubble Sort, which opens the animated visualizer).
+- Skills (sidebar) has two tabs: **Soft Skills** and **DSA**. Soft Skills is a capability map with a player level and six individual skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). Each scenario has no right or wrong answer: the approach a player chooses awards XP to the skills it shows, and the first choice per scenario counts. **DSA** has Bubble Sort, which opens the animated visualizer.
 - Animated → DSA → Bubble Sort: a 3D step-by-step visualizer with play, pause, step, scrub, speed control and custom arrays. Watching every step earns +40 XP and the Sort Sprinter badge once.
-- XP, combos, rematches, the scoreboard, sound toggle, and a mystery-chest reward.
+- XP, player levels, a scoreboard, and a sound toggle.
 - Local account registration, sign-in, sign-out, password hashing, and server-backed progress saving.
 - Play Lab (temporarily hidden; set `LAB_ENABLED = true` in `developer-app.js` and restore its sidebar button and home banner to bring it back) adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
 - Complete a mission, collect a reel, and finish the story to unlock the daily +80 XP reward. Reel, story, quest, and badge progress saves in this browser.
@@ -28,7 +26,8 @@ Everything is fictional demo content. Accounts are stored in a local JSON file, 
 
 - `index.html` — page shell and navigation
 - `style.css` — responsive styling
-- `developer-games.js` — soft-skills mission data and levels
+- `developer-games.js` — the six skills and the scenario content (options and the XP each one awards)
+- `skills.css` — styles for the Skills page and scenarios
 - `developer-app.js` — navigation, game rules, feedback, and local progress
 - `bubble-sort.js` and `bubble-sort.css` — the Bubble Sort Lab (styles are scoped under `.bs`)
 - `server.js` and `start-localhost.bat` — local web server and account API

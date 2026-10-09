@@ -9,20 +9,20 @@
       "createdAt": "2026-10-09T07:44:59.918Z",
       "progress": {
         "name": "Deepak",
-        "xp": 0,
-        "streak": 0,
-        "combo": 1,
-        "bestCombo": 1,
-        "played": [
-          "active-listening"
-        ],
-        "best": {
-          "active-listening": 100
-        },
-        "bosses": [],
-        "chests": [],
-        "rematchAt": {},
+        "xp": 150,
         "sound": false,
+        "skills": {
+          "leadership": 35,
+          "communication": 45,
+          "problem-solving": 0,
+          "collaboration": 0,
+          "time-management": 0,
+          "decision-making": 10
+        },
+        "scenarios": {
+          "bad-news": 0,
+          "stalled-project": 0
+        },
         "daily": {
           "date": "2026-10-09",
           "actions": [

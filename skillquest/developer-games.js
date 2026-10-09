@@ -1,307 +1,134 @@
+/* Soft-skills content. There are no right or wrong answers: every option is a reasonable approach,
+   and the option a player picks awards XP to the skills it shows (option.xp is { skillId: points }). */
 window.DEVQUEST_CONTENT = {
-  "coreLevels": [
-    {
-      "id": 1,
-      "name": "Say It Clearly",
-      "subtitle": "Communicate so people understand and act.",
-      "icon": "💬",
-      "color": "lavender",
-      "skill": "Communication",
-      "games": [
-        "status-update",
-        "active-listening"
-      ],
-      "boss": "escalation-note"
-    },
-    {
-      "id": 2,
-      "name": "Work Together",
-      "subtitle": "Give feedback, disagree well, resolve friction.",
-      "icon": "🤝",
-      "color": "mint",
-      "skill": "Collaboration",
-      "games": [
-        "kind-feedback",
-        "disagree-well"
-      ],
-      "boss": "team-clash"
-    },
-    {
-      "id": 3,
-      "name": "Own It",
-      "subtitle": "Take responsibility and protect your energy.",
-      "icon": "🧭",
-      "color": "peach",
-      "skill": "Ownership and resilience",
-      "games": [
-        "own-the-mistake",
-        "say-no-kindly"
-      ],
-      "boss": "crunch-week"
-    }
+  skills: [
+    { id: "leadership", name: "Leadership", desc: "Guide people, create direction and drive outcomes." },
+    { id: "communication", name: "Communication", desc: "Express ideas clearly and navigate difficult conversations." },
+    { id: "problem-solving", name: "Problem Solving", desc: "Break complex problems into actionable solutions." },
+    { id: "collaboration", name: "Collaboration", desc: "Work effectively across teams and perspectives." },
+    { id: "time-management", name: "Time Management", desc: "Prioritize work and manage competing demands." },
+    { id: "decision-making", name: "Decision Making", desc: "Evaluate trade-offs and make sound decisions." }
   ],
-  "games": {
-    "status-update": {
-      "id": "status-update",
-      "title": "The One-Minute Update",
-      "engine": "CHOICE",
-      "level": 1,
-      "kind": "choice",
-      "skill": "Clear communication",
-      "intro": "Your teammate Priya asks how the login fix is going. It is late, and you are blocked on API keys.",
-      "question": "Which reply gives Priya what she needs?",
-      "options": [
-        "Still working on it. There’s a lot going on right now.",
-        "Login fix is about 80% done. I’m blocked on the API keys, so I’ll finish by Thursday 3pm if I get them today. Can you help me get them?",
-        "It’s complicated. I’ll explain later when I have time."
-      ],
-      "answer": 1,
-      "explanation": "The second reply states progress, the blocker, a date, and a clear ask. Priya can plan around it or help right away.",
-      "concept": "Lead with status, name the blocker, give a date, and make one clear ask.",
-      "xp": 50
+  scenarios: [
+    {
+      id: "stalled-project", skill: "leadership", title: "The Stalled Project",
+      situation: "You are leading a small team on a project that has stalled for two weeks. Energy is low, deadlines are slipping, and nobody is saying why.",
+      question: "What do you do first?",
+      options: [
+        { text: "Call a short reset meeting: restate the goal, ask everyone for one blocker, and assign an owner to each.", xp: { leadership: 35, communication: 10 }, insight: "You create direction fast and make ownership explicit. Watch that quieter people still get space to speak." },
+        { text: "Take the hardest tasks yourself so the team can breathe and regain momentum.", xp: { leadership: 15, "problem-solving": 25 }, insight: "You lead from the front and remove pressure. Watch that it doesn’t become a habit that leaves you stretched." },
+        { text: "Ask the team what would make the work feel worthwhile, then let them reshape the plan with you.", xp: { leadership: 25, collaboration: 25 }, insight: "You build commitment by sharing the plan. Watch that the team still ends with a clear next step." }
+      ]
     },
-    "active-listening": {
-      "id": "active-listening",
-      "title": "Listen First",
-      "engine": "CHOICE",
-      "level": 1,
-      "kind": "choice",
-      "skill": "Active listening",
-      "intro": "A colleague, Sam, is frustrated: “Nobody ever tells me what the requirements are, and then I get blamed.”",
-      "question": "What is the best first response?",
-      "options": [
-        "Which part of the requirements was unclear on your last task? I’d like to understand before I suggest anything.",
-        "That’s just how this team works. You’ll get used to it.",
-        "You should have asked your manager sooner."
-      ],
-      "answer": 0,
-      "explanation": "A curious question shows you heard Sam and helps you find the real problem. Advice or excuses too early make people feel dismissed.",
-      "concept": "Understand first. Ask an open question before you offer a fix.",
-      "xp": 50
+    {
+      id: "new-joiner", skill: "leadership", title: "The New Joiner",
+      situation: "A new teammate is struggling in their first month. They rarely ask questions, and their first deliverable is late.",
+      question: "How do you support them?",
+      options: [
+        { text: "Pair with them for a week and work through the next task side by side.", xp: { leadership: 30, collaboration: 15 }, insight: "You invest your own time to build their confidence. Watch your own workload while you do it." },
+        { text: "Give them a clear checklist of expectations and agree on a short check-in every Friday.", xp: { leadership: 30, "time-management": 10, communication: 10 }, insight: "You set a clear structure they can follow alone. Watch that it still leaves room for them to ask for help." },
+        { text: "Let them work it out with light guidance. Learning by doing is how most people grow.", xp: { leadership: 10, "problem-solving": 20 }, insight: "You give room to grow through experience. Watch that quiet struggles don’t go unnoticed." }
+      ]
     },
-    "escalation-note": {
-      "id": "escalation-note",
-      "title": "Write the Escalation",
-      "engine": "PICK ALL",
-      "level": 1,
-      "kind": "multiSelect",
-      "skill": "Clear communication",
-      "intro": "A vendor delay might push your project back two weeks. You need to tell your manager today. Tap everything a good message includes.",
-      "items": [
-        {
-          "id": "blame",
-          "title": "Who is to blame",
-          "detail": "The vendor never listens and it’s their fault again."
-        },
-        {
-          "id": "what",
-          "title": "What happened",
-          "detail": "The vendor delivery slipped from the 10th to the 24th."
-        },
-        {
-          "id": "ask",
-          "title": "What you need and by when",
-          "detail": "Please approve the backup supplier by Friday."
-        },
-        {
-          "id": "history",
-          "title": "A long backstory",
-          "detail": "A full timeline of every email since last year."
-        },
-        {
-          "id": "impact",
-          "title": "The impact",
-          "detail": "Our launch could move by two weeks."
-        },
-        {
-          "id": "tried",
-          "title": "What you already tried",
-          "detail": "I asked for a partial delivery and checked another supplier."
-        }
-      ],
-      "answers": [
-        "what",
-        "impact",
-        "tried",
-        "ask"
-      ],
-      "explanation": "A good escalation covers what happened, the impact, what you tried, and the decision you need. Blame and long backstories hide the point.",
-      "concept": "Make it easy to act: facts, impact, effort so far, and one clear request.",
-      "xp": 70
+    {
+      id: "bad-news", skill: "communication", title: "Bad News for a Client",
+      situation: "A delivery your client is counting on will be a week late. They have not heard anything yet, and they are known to react strongly.",
+      question: "How do you tell them?",
+      options: [
+        { text: "Call them today, lead with the impact on their plans, and bring a revised timeline.", xp: { communication: 35, "decision-making": 10 }, insight: "You are direct and prepared. Watch that you leave space for their reaction before you move to solutions." },
+        { text: "Send a detailed email with the full timeline and reasons so they can read it in their own time.", xp: { communication: 25, "time-management": 10 }, insight: "You give them a clear record to refer to. Watch that important news can feel cold in writing." },
+        { text: "Ask your account manager to deliver the news, since they have the relationship.", xp: { collaboration: 20, communication: 5 }, insight: "You lean on the person with the strongest trust. Watch that you stay involved so you can answer detail questions." }
+      ]
     },
-    "kind-feedback": {
-      "id": "kind-feedback",
-      "title": "Feedback That Lands",
-      "engine": "CHOICE",
-      "level": 2,
-      "kind": "choice",
-      "skill": "Giving feedback",
-      "intro": "A teammate’s slide deck is hard to follow: too much text, no clear point. You want to help.",
-      "question": "Which feedback is most useful?",
-      "options": [
-        "This deck is a mess.",
-        "Maybe ask someone else to review it, I’m not a design person.",
-        "I got lost around slide 4 because it has a lot of text. Could you cut it to one key point per slide?"
-      ],
-      "answer": 2,
-      "explanation": "It names a specific moment, explains the effect, and suggests a next step, without attacking the person.",
-      "concept": "Be specific: what you saw, what it caused, and what could help.",
-      "xp": 55
+    {
+      id: "vague-request", skill: "communication", title: "The Vague Request",
+      situation: "A stakeholder sends you a one-line message: “Can we make the dashboard better by next week?” No details.",
+      question: "What is your reply?",
+      options: [
+        { text: "Reply with three short clarifying questions about the goal, the audience, and what “better” means.", xp: { communication: 30, "problem-solving": 15 }, insight: "You get shared clarity before spending effort. Watch that it doesn’t feel like extra work for a busy sender." },
+        { text: "Draft your best guess quickly and share it so they can react to something real.", xp: { "problem-solving": 25, "decision-making": 15, communication: 10 }, insight: "You make progress and learn from feedback. Watch the risk of building the wrong thing." },
+        { text: "Book a fifteen-minute call to talk it through together.", xp: { communication: 30, collaboration: 10 }, insight: "You use conversation to get depth fast. Watch that you capture what was agreed afterwards." }
+      ]
     },
-    "disagree-well": {
-      "id": "disagree-well",
-      "title": "Disagree Well",
-      "engine": "CHOICE",
-      "level": 2,
-      "kind": "choice",
-      "skill": "Respectful disagreement",
-      "intro": "In a meeting, a senior colleague proposes a plan you think is risky. Others are nodding.",
-      "question": "What do you do?",
-      "options": [
-        "Say “I see it differently, can I share the risk I’m worried about?” and then explain it with an example.",
-        "Stay quiet now and complain to teammates afterwards.",
-        "Interrupt and say the plan is wrong."
-      ],
-      "answer": 0,
-      "explanation": "Asking to share your view keeps the conversation open, and a concrete example gives people something to weigh instead of something to defend against.",
-      "concept": "Disagree in the room, about the idea, and bring a reason.",
-      "xp": 55
+    {
+      id: "recurring-error", skill: "problem-solving", title: "The Recurring Error",
+      situation: "The same issue has now appeared three times in the last month. Each time it was patched quickly, and each time it came back.",
+      question: "What is your approach?",
+      options: [
+        { text: "Set aside a day to trace the root cause properly, even though it delays other work.", xp: { "problem-solving": 35, "decision-making": 5 }, insight: "You aim for a lasting fix. Watch that the time you spend is agreed with the people waiting on you." },
+        { text: "Put in a quick workaround now, and log a ticket to fix the cause properly later.", xp: { "decision-making": 25, "time-management": 15, "problem-solving": 10 }, insight: "You protect today’s delivery and still note the issue. Watch that the ticket doesn’t get lost." },
+        { text: "Gather the people who have hit it and compare what each of them noticed.", xp: { collaboration: 25, "problem-solving": 20 }, insight: "You pool different views to see the pattern. Watch that the conversation ends with an owner." }
+      ]
     },
-    "team-clash": {
-      "id": "team-clash",
-      "title": "Calm the Clash",
-      "engine": "PICK ALL",
-      "level": 2,
-      "kind": "multiSelect",
-      "skill": "Conflict resolution",
-      "intro": "Two teammates keep arguing over who owns a task, and the team is getting tense. You are asked to help. Tap every helpful move.",
-      "items": [
-        {
-          "id": "side",
-          "title": "Quietly take one person’s side",
-          "detail": "Back whoever you like more."
-        },
-        {
-          "id": "separate",
-          "title": "Talk to each person separately first",
-          "detail": "Let each one explain how they see it."
-        },
-        {
-          "id": "public",
-          "title": "Call them out in the team chat",
-          "detail": "Let everyone see who is wrong."
-        },
-        {
-          "id": "goal",
-          "title": "Find the shared goal",
-          "detail": "Both want the release to go out on time."
-        },
-        {
-          "id": "ignore",
-          "title": "Hope it blows over",
-          "detail": "Avoid the topic and carry on."
-        },
-        {
-          "id": "roles",
-          "title": "Agree who owns what",
-          "detail": "Write the ownership down so it’s clear."
-        }
-      ],
-      "answers": [
-        "separate",
-        "goal",
-        "roles"
-      ],
-      "explanation": "Listening to both sides, finding the shared goal, and making ownership explicit solves the cause. Taking sides, ignoring it, or shaming people makes it worse.",
-      "concept": "Listen to both sides, anchor on the shared goal, and make agreements explicit.",
-      "xp": 75
+    {
+      id: "tight-budget", skill: "problem-solving", title: "The Tight Budget",
+      situation: "Your project has just lost 30% of its budget, but the launch date and the main goal have not changed.",
+      question: "Where do you start?",
+      options: [
+        { text: "List the must-haves and the nice-to-haves, then cut the nice-to-haves.", xp: { "decision-making": 30, "problem-solving": 20 }, insight: "You simplify by priority. Watch that you check with stakeholders before you cut things they care about." },
+        { text: "Look for a creative alternative that reaches the same outcome with fewer resources.", xp: { "problem-solving": 35, leadership: 10 }, insight: "You reframe the problem instead of shrinking it. Watch that the idea is tested before you rely on it." },
+        { text: "Ask your stakeholders which outcomes they would trade, and agree the new scope together.", xp: { communication: 20, collaboration: 20, "decision-making": 10 }, insight: "You share the trade-off with the people it affects. Watch that you bring a recommendation to the conversation." }
+      ]
     },
-    "own-the-mistake": {
-      "id": "own-the-mistake",
-      "title": "Own the Mistake",
-      "engine": "CHOICE",
-      "level": 3,
-      "kind": "choice",
-      "skill": "Accountability",
-      "intro": "You sent the wrong file to a client by mistake. Nobody has noticed yet.",
-      "question": "What is the best next step?",
-      "options": [
-        "Wait and see. Maybe the client won’t open it.",
-        "Quietly send the right file and say nothing.",
-        "Tell your manager and the client now, send the correct file, and say what you’ll do to prevent it."
-      ],
-      "answer": 2,
-      "explanation": "Telling people quickly, fixing it, and sharing how you will prevent a repeat protects trust. Hiding it risks a bigger problem later.",
-      "concept": "Speak up fast, fix it, and say how you’ll stop it happening again.",
-      "xp": 60
+    {
+      id: "slow-handoff", skill: "collaboration", title: "The Slow Handoff",
+      situation: "Another team owns a piece your work depends on. They are slower than planned and not replying quickly.",
+      question: "What do you do?",
+      options: [
+        { text: "Join their stand-up, ask what is blocking them, and offer a hand where you can.", xp: { collaboration: 35, communication: 10 }, insight: "You build the relationship while you unblock the work. Watch that you also protect your own time." },
+        { text: "Write down the dependency and the date you need it, and escalate if it slips again.", xp: { communication: 20, "decision-making": 15, "time-management": 5 }, insight: "You make the risk visible and keep a record. Watch that the tone stays supportive." },
+        { text: "Re-plan your work so it no longer depends on them.", xp: { "problem-solving": 25, "time-management": 15 }, insight: "You stay in control of your own delivery. Watch that you still tell them how it affects them." }
+      ]
     },
-    "say-no-kindly": {
-      "id": "say-no-kindly",
-      "title": "Say No, Kindly",
-      "engine": "CHOICE",
-      "level": 3,
-      "kind": "choice",
-      "skill": "Setting boundaries",
-      "intro": "You are already at capacity this week when your manager asks you to take on one more urgent task.",
-      "question": "Which response works best?",
-      "options": [
-        "Sure, no problem.",
-        "I’m full this week with the report and the client demo. If this is the priority, which should I move, or can it start Monday?",
-        "No. I’m too busy."
-      ],
-      "answer": 1,
-      "explanation": "It is honest about your workload and offers options, so your manager can make the trade-off instead of being surprised later.",
-      "concept": "Show your current load and offer a trade-off instead of a flat yes or no.",
-      "xp": 60
+    {
+      id: "two-approaches", skill: "collaboration", title: "Two Approaches",
+      situation: "A teammate you respect wants to solve a problem a different way than you do. You both think your way is better.",
+      question: "How do you move forward?",
+      options: [
+        { text: "Suggest a small experiment to test both approaches and compare the results.", xp: { collaboration: 25, "problem-solving": 25 }, insight: "You turn a debate into evidence. Watch that the experiment is small enough not to become a project of its own." },
+        { text: "Go with their approach this time to keep the relationship strong, and raise yours later.", xp: { collaboration: 25, leadership: 5 }, insight: "You value the team’s harmony. Watch that your own view still gets heard." },
+        { text: "Make your case with the facts you have, and ask your manager to decide if you stay split.", xp: { "decision-making": 25, communication: 15 }, insight: "You get a clear decision without a long stand-off. Watch that it doesn’t feel like you went over their head." }
+      ]
     },
-    "crunch-week": {
-      "id": "crunch-week",
-      "title": "Survive Crunch Week",
-      "engine": "PICK ALL",
-      "level": 3,
-      "kind": "multiSelect",
-      "skill": "Resilience",
-      "intro": "A big deadline is coming and you feel stressed and tired. Tap every move that helps you stay effective.",
-      "items": [
-        {
-          "id": "alone",
-          "title": "Hide the stress and push through alone",
-          "detail": "Don’t tell anyone you’re struggling."
-        },
-        {
-          "id": "prioritize",
-          "title": "Pick the top three priorities",
-          "detail": "Decide what truly must be done."
-        },
-        {
-          "id": "all",
-          "title": "Try to do everything at once",
-          "detail": "Work on every task in parallel."
-        },
-        {
-          "id": "help",
-          "title": "Ask for help early",
-          "detail": "Tell someone before you are stuck."
-        },
-        {
-          "id": "skip",
-          "title": "Skip meals and sleep",
-          "detail": "Work through the night."
-        },
-        {
-          "id": "breaks",
-          "title": "Take short breaks and sleep",
-          "detail": "Protect your energy."
-        }
-      ],
-      "answers": [
-        "prioritize",
-        "help",
-        "breaks"
-      ],
-      "explanation": "Focus, early help, and rest keep your judgement sharp. Hiding stress and burning out slows you down.",
-      "concept": "Focus on what matters, ask early, and protect your energy.",
-      "xp": 80
+    {
+      id: "overloaded-monday", skill: "time-management", title: "Overloaded Monday",
+      situation: "It is Monday morning and you have five urgent tasks. Each person who asked says theirs is the most important.",
+      question: "How do you plan your week?",
+      options: [
+        { text: "Rank them by impact and deadline, start on the top two, and renegotiate dates for the rest.", xp: { "time-management": 35, "decision-making": 15 }, insight: "You choose deliberately and tell people early. Watch that you explain your reasoning kindly." },
+        { text: "Time-box each task to an hour and rotate through them, so each one moves forward.", xp: { "time-management": 25, "problem-solving": 10 }, insight: "You keep everything moving. Watch that switching tasks doesn’t eat your focus." },
+        { text: "Ask your manager and teammates which tasks to hand off or drop.", xp: { communication: 15, collaboration: 15, "time-management": 10 }, insight: "You bring the trade-off to the people who own it. Watch that you arrive with a suggestion too." }
+      ]
+    },
+    {
+      id: "constant-interruptions", skill: "time-management", title: "Constant Interruptions",
+      situation: "You have a report due Friday, but your chat and inbox keep pulling you away, and you are not getting deep work done.",
+      question: "What changes do you make?",
+      options: [
+        { text: "Block two focus sessions each day, put them on the shared calendar, and say when you will reply.", xp: { "time-management": 30, communication: 10 }, insight: "You protect time and set expectations openly. Watch that urgent matters still have a way to reach you." },
+        { text: "Check messages only at set times, in batches, and silence notifications in between.", xp: { "time-management": 30, "decision-making": 5 }, insight: "You build a personal system that you control. Watch that teammates know it so they don’t feel ignored." },
+        { text: "Stay available. Helping people when they ask is part of the job, so you will catch up in the evening.", xp: { collaboration: 25, "time-management": 5 }, insight: "You put the team’s needs first. Watch for the cost to your own work and your energy." }
+      ]
+    },
+    {
+      id: "quick-fix-or-rebuild", skill: "decision-making", title: "Quick Fix or Rebuild",
+      situation: "A tool your team relies on keeps breaking. You can patch it in an afternoon, or spend two weeks rebuilding it properly.",
+      question: "What do you decide?",
+      options: [
+        { text: "Patch it now so the team is unblocked, and schedule the rebuild for next quarter.", xp: { "decision-making": 30, "time-management": 15 }, insight: "You balance today’s needs with the longer view. Watch that the rebuild really gets scheduled." },
+        { text: "Commit to the rebuild. It costs more now, but it ends the repeat problems.", xp: { "decision-making": 25, "problem-solving": 20 }, insight: "You invest for the long run. Watch that you tell people what they will wait for in the meantime." },
+        { text: "Share both options with the team, hear their views, and decide by the end of the day.", xp: { collaboration: 20, "decision-making": 20, leadership: 5 }, insight: "You decide with context and keep people involved. Watch that you do make the call on time." }
+      ]
+    },
+    {
+      id: "incomplete-information", skill: "decision-making", title: "Incomplete Information",
+      situation: "You need to choose a vendor today. You have about 60% of the information you would like, and waiting a week would cost you the discount.",
+      question: "How do you proceed?",
+      options: [
+        { text: "Decide today, write down your assumptions, and set a date to review how it is going.", xp: { "decision-making": 35, communication: 10 }, insight: "You act with confidence and stay open to change. Watch that the review date is honoured." },
+        { text: "Run a quick small test with each vendor to fill in the biggest gaps, then decide.", xp: { "problem-solving": 25, "decision-making": 15 }, insight: "You reduce the biggest risk first. Watch that the test doesn’t cost the discount you were trying to keep." },
+        { text: "Ask a colleague who has used these vendors before and weigh their experience.", xp: { collaboration: 20, "decision-making": 10 }, insight: "You borrow experience you don’t have. Watch that the final decision is still clearly yours." }
+      ]
     }
-  }
+  ]
 };
