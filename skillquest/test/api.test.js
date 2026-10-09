@@ -17,7 +17,7 @@ test.before(async () => {
   await db.connect();
   await db.query("DROP TABLE IF EXISTS sessions, users, schema_migrations");
   await db.end();
-  child = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], { env: Object.assign({}, process.env, { PORT: "0", HOST: "127.0.0.1", DATABASE_URL: TEST_DB }), stdio: ["ignore", "pipe", "inherit"] });
+  child = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], { env: Object.assign({}, process.env, { PORT: "0", HOST: "127.0.0.1", DATABASE_URL: TEST_DB, REGISTER_LIMIT_PER_HOUR: "100" }), stdio: ["ignore", "pipe", "inherit"] });
   base = await new Promise((resolve, reject) => {
     child.stdout.on("data", chunk => { const m = /http:\/\/[\d.]+:(\d+)/.exec(String(chunk)); if (m) resolve("http://127.0.0.1:" + m[1]); });
     child.on("exit", () => reject(new Error("server exited")));
@@ -92,6 +92,8 @@ test("profile edits validate the name and photo", async () => {
   assert.strictEqual(user.name, "Di Wu Jr");
   assert.strictEqual(user.avatar, png);
   assert.strictEqual((await post("/api/profile", { name: "Nope" })).status, 401);
+  assert.strictEqual((await post("/api/profile", { avatar: "preset:fox" }, cookie)).status, 200);
+  assert.strictEqual((await post("/api/profile", { avatar: "preset:dragon" }, cookie)).status, 400);
 });
 
 test("leaderboard ranks by XP, flags the signed-in player and hides emails", async () => {
@@ -110,6 +112,14 @@ test("game data needs a signed-in player", async () => {
   assert.strictEqual((await post("/api/progress", { progress: { xp: 5 } })).status, 401);
   const health = await fetch(base + "/api/health");
   assert.strictEqual(health.status, 200);
+});
+
+test("signing out on all devices ends every session", async () => {
+  await register("Ed Ko", "ed@example.com");
+  const a = cookieOf(await post("/api/login", { email: "ed@example.com", password: "correct-horse-1" }));
+  const b = cookieOf(await post("/api/login", { email: "ed@example.com", password: "correct-horse-1" }));
+  assert.strictEqual((await post("/api/logout-all", {}, a)).status, 200);
+  assert.strictEqual((await fetch(base + "/api/me", { headers: { Cookie: b } })).status, 401);
 });
 
 test("logging in is rate limited", async () => {

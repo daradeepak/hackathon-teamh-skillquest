@@ -44,11 +44,11 @@
         <p>No pressure. Just a little practice and a tiny win.</p>
         <button class="text-button" data-action="continue">Let’s play <span>→</span></button>
       </div>
-      <div class="sidebar-bottom">
-        <button class="avatar" id="profile-avatar" data-action="profile" aria-label="Open your profile">AM</button>
-        <div class="profile-mini"><strong id="profile-name">Arjun</strong><span id="profile-subtitle">Junior dev · Level 2</span></div>
-        <button class="icon-button reset-button" data-action="reset" aria-label="Reset progress" title="Reset progress">↻</button>
-      </div>
+      <button class="sidebar-bottom settings-entry" id="settings-entry" type="button" data-action="settings" aria-label="Open settings">
+        <span class="avatar avatar-default" id="profile-avatar" aria-hidden="true"></span>
+        <span class="profile-mini"><strong id="profile-name">Player</strong><span id="profile-subtitle">Level 1</span></span>
+        <span class="settings-gear" aria-hidden="true">⚙</span>
+      </button>
     </aside>
 
     <main class="main-area">
@@ -56,10 +56,8 @@
         <div class="breadcrumb"><span>Your game corner</span><span class="breadcrumb-slash">/</span><strong id="page-label">Home</strong></div>
         <div class="topbar-right">
           <span class="topbar-caption">Tiny missions, real-life skills</span>
-          <button class="account-toggle" id="account-toggle" data-action="account">Account</button>
           <button class="theme-toggle" id="theme-toggle" data-action="theme" aria-pressed="false" aria-label="Switch to dark mode" title="Switch theme">🌙</button>
-          <button class="sound-toggle" data-action="sound" aria-pressed="false">🔈 Sound off</button>
-          <button class="top-avatar" id="top-avatar" data-action="profile" aria-label="Open your profile">AM</button>
+          <button class="top-avatar avatar-default" id="top-avatar" data-action="settings" aria-label="Open settings"></button>
         </div>
       </header>
       <div id="app-main" class="page-content" tabindex="-1"></div>

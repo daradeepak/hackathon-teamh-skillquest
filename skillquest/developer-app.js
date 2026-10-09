@@ -2,7 +2,7 @@
   "use strict";
   var D = window.DEVQUEST_CONTENT, SKILLS = D.skills, SCEN = D.scenarios, TECH = D.techSkills, CHAL = D.challenges, LESSONS = D.lessons, root = document.getElementById("app-main");
   var label = document.getElementById("page-label"), toast = document.getElementById("toast");
-  var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "core", hint = false;
+  var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "tech", hint = false;
   var account = null, accountMode = "login";
   var TRAIL = ((window.DEVQUEST_JS_LESSONS && window.DEVQUEST_JS_LESSONS.lessons) || []).map(function(l) {
     return { id: l.id, skill: "javascript", title: l.title, icon: l.icon, world: l.world, trail: true };
@@ -55,37 +55,73 @@
   function accountInitials(name) {
     return String(name || "Learner").trim().split(/\s+/).slice(0, 2).map(function(part) { return part.charAt(0); }).join("").toUpperCase() || "L";
   }
+  /* ---------- avatars: an uploaded photo, one of the preset characters, or the default silhouette ---------- */
+  var AVATAR_PRESETS = [
+    { id: "fox", emoji: "🦊", bg: "#ffe3cc" }, { id: "owl", emoji: "🦉", bg: "#e6e0ff" }, { id: "panda", emoji: "🐼", bg: "#e3f4e6" }, { id: "cat", emoji: "🐱", bg: "#fff1cc" },
+    { id: "robot", emoji: "🤖", bg: "#dcefff" }, { id: "rocket", emoji: "🚀", bg: "#fde2ea" }, { id: "koala", emoji: "🐨", bg: "#e9edf3" }, { id: "octopus", emoji: "🐙", bg: "#ffe0f0" }
+  ];
+  function presetFor(value) { var m = /^preset:([a-z]+)$/.exec(value || ""); return m ? AVATAR_PRESETS.find(function(p) { return p.id === m[1]; }) : null; }
+  function validAvatar(value) { return AVATAR_RE.test(value || "") || !!presetFor(value); }
   function paintAvatar(node, initials, photo) {
-    node.textContent = initials;
-    if (photo && AVATAR_RE.test(photo)) { node.style.backgroundImage = 'url("' + photo + '")'; node.classList.add("has-photo"); }
-    else { node.style.backgroundImage = ""; node.classList.remove("has-photo"); }
+    var preset = presetFor(photo);
+    node.classList.remove("has-photo", "has-preset", "avatar-default");
+    node.style.backgroundImage = ""; node.style.backgroundColor = "";
+    if (photo && AVATAR_RE.test(photo)) { node.textContent = ""; node.style.backgroundImage = 'url("' + photo + '")'; node.classList.add("has-photo"); }
+    else if (preset) { node.textContent = preset.emoji; node.style.backgroundColor = preset.bg; node.classList.add("has-preset"); }
+    else { node.textContent = ""; node.classList.add("avatar-default"); }
   }
+  function avatarHtml(cls, value) {
+    var preset = presetFor(value);
+    if (AVATAR_RE.test(value || "")) return '<span class="' + cls + ' has-photo" style="background-image:url(\'' + value + '\')" aria-hidden="true"></span>';
+    if (preset) return '<span class="' + cls + ' has-preset" style="background-color:' + preset.bg + '" aria-hidden="true">' + preset.emoji + '</span>';
+    return '<span class="' + cls + ' avatar-default" aria-hidden="true"></span>';
+  }
+  var SETTINGS_KEY = "xpedition-settings";
+  var DEFAULT_SETTINGS = { textSize: "normal", motion: "system", lessonSpeed: "normal", mapStart: "tech" };
+  function getSettings() {
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (e) {}
+    return Object.assign({}, DEFAULT_SETTINGS, saved);
+  }
+  function applySettings(settings) {
+    var html = document.documentElement;
+    html.classList.toggle("text-large", settings.textSize === "large");
+    html.classList.toggle("text-larger", settings.textSize === "larger");
+    html.classList.toggle("reduce-motion", settings.motion === "reduce");
+  }
+  function setSetting(key, value) {
+    var settings = getSettings(); settings[key] = value;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+    applySettings(settings);
+  }
+  function lessonInterval() { return { slow: 3400, normal: 2200, fast: 1300 }[getSettings().lessonSpeed] || 2200; }
   function currentTheme() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
   function syncThemeUi() {
     var dark = currentTheme() === "dark", button = document.getElementById("theme-toggle"), meta = document.querySelector('meta[name="theme-color"]');
     if (button) { button.textContent = dark ? "☀️" : "🌙"; button.setAttribute("aria-pressed", String(dark)); button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode"); button.title = dark ? "Switch to light mode" : "Switch to dark mode"; }
     if (meta) meta.setAttribute("content", dark ? "#14161c" : "#f3f3ee");
   }
+  function themeChoice() { try { return localStorage.getItem("xpedition-theme") || "system"; } catch (e) { return "system"; } }
   function setTheme(theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("xpedition-theme", theme); } catch (e) {}
+    var resolved = theme === "system" ? (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme;
+    document.documentElement.setAttribute("data-theme", resolved);
+    try { if (theme === "system") localStorage.removeItem("xpedition-theme"); else localStorage.setItem("xpedition-theme", theme); } catch (e) {}
     syncThemeUi();
   }
   function syncAccountUi() {
     var name = account ? account.name : state.name;
     var avatar = accountInitials(name);
+    var settingsEntry = document.getElementById("settings-entry"); if (settingsEntry) settingsEntry.setAttribute("aria-label", "Open settings for " + name);
     var profileName = document.getElementById("profile-name"), profileSubtitle = document.getElementById("profile-subtitle");
     var profileAvatar = document.getElementById("profile-avatar"), topAvatar = document.getElementById("top-avatar");
-    var toggle = document.getElementById("account-toggle");
     if (profileName) profileName.textContent = name;
     if (profileSubtitle) profileSubtitle.textContent = "Level " + currentLevel() + " · " + playerLevel().name;
     var photo = account ? account.avatar : state.avatar;
     [profileAvatar, topAvatar].forEach(function(node) { if (node) paintAvatar(node, avatar, photo); });
-    if (toggle) { toggle.textContent = "Account · " + name; toggle.setAttribute("aria-label", "Manage your account"); }
   }
   function normalizedProgress(progress, name) { return normalize(progress, name); }
   async function activateAccount(user) {
-    account = { id: user.id, name: user.name, email: user.email, avatar: AVATAR_RE.test(user.avatar) ? user.avatar : "" };
+    account = { id: user.id, name: user.name, email: user.email, avatar: validAvatar(user.avatar) ? user.avatar : "" };
     KEY = BASE_KEY + ":account:" + account.id;
     var cached = null, remote = normalizedProgress(user.progress, account.name);
     try { cached = normalizedProgress(JSON.parse(localStorage.getItem(KEY)), account.name); } catch (e) {}
@@ -175,8 +211,8 @@
     if (!account) return;
     profileDraft = { name: account.name, avatar: account.avatar };
     modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><span class="account-kicker">YOUR PROFILE</span><h2 id="profile-title">Make it yours</h2>' +
-      '<form id="profile-form"><div class="profile-photo-row"><span class="profile-photo" id="profile-preview" aria-hidden="true"></span><div class="profile-photo-actions"><button type="button" data-action="profile-photo">Upload photo</button><button type="button" data-action="profile-photo-remove">Remove photo</button></div><input class="profile-hidden-input" id="profile-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" aria-label="Upload a profile photo"></div>' +
-      '<label class="account-field">Display name<input name="name" id="profile-name-input" type="text" minlength="2" maxlength="40" required autocomplete="name" value="' + esc(profileDraft.name) + '"></label><p id="profile-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">Save profile</button></form>' +
+      '<form id="profile-form"><div class="profile-photo-row"><span class="profile-photo" id="profile-preview" aria-hidden="true"></span><div class="profile-photo-actions"><button type="button" data-action="profile-photo">Upload photo</button><button type="button" data-action="profile-photo-remove">Use default</button></div><input class="profile-hidden-input" id="profile-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" aria-label="Upload a profile photo"></div>' +
+      '<div class="avatar-presets" role="group" aria-label="Pick an avatar">' + AVATAR_PRESETS.map(function(p) { return '<button type="button" class="avatar-preset' + (profileDraft.avatar === "preset:" + p.id ? " on" : "") + '" data-preset="' + p.id + '" style="background-color:' + p.bg + '" aria-label="Use the ' + p.id + ' avatar" aria-pressed="' + (profileDraft.avatar === "preset:" + p.id) + '">' + p.emoji + '</button>'; }).join("") + '</div><label class="account-field">Display name<input name="name" id="profile-name-input" type="text" minlength="2" maxlength="40" required autocomplete="name" value="' + esc(profileDraft.name) + '"></label><p id="profile-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">Save profile</button></form>' +
       ('<button class="account-secondary" data-action="account-logout">Sign out</button><p class="profile-note">Signed in as ' + esc(account.email) + '. Your name and photo show on the leaderboard.</p>') + '</section></div>';
     profilePreview();
     var field = document.getElementById("profile-name-input"); if (field) field.focus();
@@ -192,7 +228,7 @@
         var result = await response.json();
         if (response.status === 401) { sessionEnded(); return; }
         if (!response.ok) throw new Error(result.error || "Could not save your profile.");
-        account.name = result.user.name; account.avatar = AVATAR_RE.test(result.user.avatar) ? result.user.avatar : ""; state.name = account.name;
+        account.name = result.user.name; account.avatar = validAvatar(result.user.avatar) ? result.user.avatar : ""; state.name = account.name;
       }
       save(); closeAccountModal(); syncAccountUi(); draw(); say("Profile saved!");
     } catch (problem) { error.textContent = problem.message || "Could not save your profile."; button.disabled = false; button.textContent = "Save profile"; }
@@ -204,9 +240,8 @@
     fetch("/api/leaderboard", { headers: { "Accept": "application/json" } }).then(function(r) { if (r.status === 401) { sessionEnded(); throw new Error("signed out"); } if (!r.ok) throw new Error(); return r.json(); }).then(function(data) {
       if (token !== lbToken || view !== "leaderboard") return;
       var rows = data.players.map(function(p) {
-        var photo = AVATAR_RE.test(p.avatar) ? ' has-photo" style="background-image:url(\'' + p.avatar + '\')' : "";
         var lvl = levelInfo(p.xp, PLAYER_AT);
-        return '<li class="lb-row' + (p.me ? " me" : "") + '"><span class="lb-rank">' + (p.rank <= 3 ? ["🥇", "🥈", "🥉"][p.rank - 1] : "#" + p.rank) + '</span><span class="lb-photo' + photo + '">' + esc(accountInitials(p.name)) + '</span><span class="lb-name"><span>' + esc(p.name) + (p.me ? '<span class="lb-you">YOU</span>' : "") + '</span><small>Level ' + lvl.n + ' · ' + esc(PLAYER_LEVELS[lvl.n - 1][0]) + '</small></span><span class="lb-xp">' + p.xp + ' XP</span></li>';
+        return '<li class="lb-row' + (p.me ? " me" : "") + '"><span class="lb-rank">' + (p.rank <= 3 ? ["🥇", "🥈", "🥉"][p.rank - 1] : "#" + p.rank) + '</span>' + avatarHtml("lb-photo", p.avatar) + '<span class="lb-name"><span>' + esc(p.name) + (p.me ? '<span class="lb-you">YOU</span>' : "") + '</span><small>Level ' + lvl.n + ' · ' + esc(PLAYER_LEVELS[lvl.n - 1][0]) + '</small></span><span class="lb-xp">' + p.xp + ' XP</span></li>';
       }).join("");
       var body = data.players.length ? '<ol class="lb-list">' + rows + '</ol>' : '<div class="lb-list"><p class="lb-empty">No players yet. Create an account to be the first on the board.</p></div>';
       var foot = '<p class="lb-note">Showing the top players plus you. ' + data.total + ' registered in total.</p>';
@@ -322,8 +357,6 @@
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (view === "search") mountSearchLab(); else if (window.XPBinarySearch) window.XPBinarySearch.unmount();
     syncAccountUi();
-    var sound = document.querySelector("[data-action='sound']");
-    if (sound) { sound.textContent = state.sound ? "🔊 Sound on" : "🔈 Sound off"; sound.setAttribute("aria-pressed", String(state.sound)); }
   }
   function skillRow(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT);
@@ -334,10 +367,10 @@
     root.innerHTML =
       '<section class="dev-welcome"><div class="dev-wave">👋</div><div class="dev-welcome-copy"><span class="dev-eyebrow">SOFT SKILLS</span><h1>Hey ' + esc(state.name) + '! Ready to practice a real-life moment?</h1><p>Short scenarios that build the people skills great teams run on.</p></div><div class="dev-top-stats"><span class="dev-chip xp-chip">⚡ ' + state.xp + ' XP</span><span class="dev-chip">🏅 Level ' + pl.n + ' · ' + esc(pl.name) + '</span></div></section>' +
       '<section class="dev-hero"><div class="dev-hero-copy"><span class="dev-hero-tag">💬 NEXT UP · ' + esc(next.title.toUpperCase()) + '</span><h2>What would you do<br>in this moment?</h2><p>Read a short workplace scenario and choose the approach that feels like you. There are no wrong answers. Each choice builds different skills.</p><button class="primary-button dev-play-button" data-action="continue">Play next scenario →</button></div><div class="dev-hero-art"><div class="dev-orbit"></div><div class="dev-mascot">🦊</div><div class="dev-speech">Pip: how would that land?</div><span class="dev-float f1">✨ ' + done + '/' + total + ' played</span><span class="dev-float f2">+ XP</span></div></section>' +
-      '<section class="dev-bottom-grid"><div class="dev-panel"><div class="dev-panel-head"><h3>🧠 Your skills</h3><button class="dev-link" data-nav="map">See all →</button></div>' + SKILLS.map(skillRow).join("") + '</div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>💻 Technical Skills</h3><p>Game-style challenges in HTML, CSS and JavaScript. Earn XP for every one you crack.</p><button class="secondary-button" data-action="tech">Open Technical Skills →</button></div></section>';
+      '<section class="dev-bottom-grid home-teasers"><div class="dev-panel teaser-panel"><span class="dev-eyebrow">PLAY LAB</span><h3>🧮 Watch algorithms move</h3><p>Step through Bubble Sort and Binary Search with the real code beside the animation.</p><button class="secondary-button" data-nav="anim">Open Play Lab →</button></div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>💻 Technical Skills</h3><p>Game-style challenges in HTML, CSS and JavaScript. Earn XP for every one you crack.</p><button class="secondary-button" data-action="tech">Open Technical Skills →</button></div></section>';
   }
   function trackTabs(active) {
-    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button></div>';
+    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button></div>';
   }
   function skillCard(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT), list = SCEN.filter(function(x) { return x.skill === k.id; }), done = list.filter(function(x) { return played(x.id); }).length;
@@ -368,7 +401,7 @@
   }
   function stats() {
     var pl = playerLevel(), list = SCEN.filter(function(x) { return played(x.id); }), top = SKILLS.slice().sort(function(a, b) { return state.skills[b.id] - state.skills[a.id]; })[0];
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR PROGRESS</span><h1>Nice work, ' + esc(state.name) + ' ✨</h1><p>Stats track practice. They’re not a work-performance score.</p></div><button class="secondary-button" data-action="reset">Reset progress</button></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR PROGRESS</span><h1>Nice work, ' + esc(state.name) + ' ✨</h1><p>Stats track practice. They’re not a work-performance score.</p></div><button class="secondary-button" data-action="settings-ask-reset">Reset progress…</button></section>' +
       '<section class="dev-stats-hero"><div><span class="dev-rank-pill">🏅 ' + esc(pl.name) + '</span><h2>' + state.xp + ' <small>XP</small></h2><p>Keep exploring different approaches. Every choice builds something.</p></div><div class="dev-stat-stack"><div><strong>🏅 ' + pl.n + '</strong><span>player level</span></div><div><strong>🎯 ' + list.length + '/' + SCEN.length + '</strong><span>scenarios played</span></div><div><strong>⭐ ' + (state.skills[top.id] ? esc(top.name) : "—") + '</strong><span>top skill</span></div></div></section>' +
       '<div class="dev-stats-grid"><section class="dev-panel"><div class="dev-panel-head"><h3>🧠 Skill levels</h3><span>XP by skill</span></div>' + SKILLS.map(skillRow).join("") + '<div class="dev-panel-head sk-subhead"><h3>💻 Technical skills</h3></div>' + TECH.map(skillRow).join("") + '</section>' +
       '<section class="dev-panel"><div class="dev-panel-head"><h3>🗒️ Recent scenarios</h3><span>Your approach</span></div>' + (list.length ? list.slice(-6).reverse().map(function(x) { return '<div class="score-row"><span>' + esc(x.title) + '</span><b>' + String.fromCharCode(65 + state.scenarios[x.id]) + '</b></div>'; }).join("") : '<p class="dev-muted">Play a scenario and your choices show up here.</p>') + '</section></div><p class="dev-fineprint">All progress stays in this browser unless you sign in to a local account.</p>';
@@ -799,18 +832,67 @@
     if (!state.sound) return;
     try { var C = window.AudioContext || window.webkitAudioContext; if (!C) return; var c = new C(), o = c.createOscillator(), v = c.createGain(); o.frequency.value = 740; v.gain.value = .04; o.connect(v); v.connect(c.destination); o.start(); o.stop(c.currentTime + .12); setTimeout(function() { c.close(); }, 250); } catch (e) {}
   }
+  var settingsConfirm = null;
+  function segmented(name, value, options) {
+    return '<div class="settings-seg" role="radiogroup" aria-label="' + esc(name) + '">' + options.map(function(o) {
+      return '<button type="button" role="radio" aria-checked="' + (o[0] === value) + '" class="' + (o[0] === value ? "on" : "") + '" data-setting="' + esc(name) + '" data-value="' + o[0] + '">' + esc(o[1]) + '</button>';
+    }).join("") + '</div>';
+  }
+  function settingSwitch(name, on, label) {
+    return '<button type="button" class="settings-switch" role="switch" aria-checked="' + on + '" data-setting="' + name + '" data-value="' + (on ? "off" : "on") + '" aria-label="' + esc(label) + '"><span></span></button>';
+  }
+  function settingsRow(title, hint, control) { return '<div class="settings-row"><div><strong>' + title + '</strong>' + (hint ? '<small>' + hint + '</small>' : "") + '</div>' + control + '</div>'; }
+  function renderSettings() {
+    var modal = document.getElementById("account-modal-root"); if (!modal || !account) return;
+    var st = getSettings();
+    modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><span class="account-kicker">APPLICATION SETTINGS</span><h2 id="settings-title">Settings</h2>' +
+      '<div class="settings-profile">' + avatarHtml("settings-avatar", account.avatar) + '<div><strong>' + esc(account.name) + '</strong><small>' + esc(account.email) + '</small><small>Level ' + currentLevel() + ' · ' + esc(playerLevel().name) + ' · ' + state.xp + ' XP</small></div><button type="button" class="secondary-button" data-action="profile">Edit profile</button></div>' +
+      '<h3 class="settings-head">Appearance</h3>' +
+      settingsRow("Theme", "", segmented("theme", themeChoice(), [["light", "Light"], ["dark", "Dark"], ["system", "System"]])) +
+      settingsRow("Text size", "Makes everything a little bigger.", segmented("textSize", st.textSize, [["normal", "Normal"], ["large", "Large"], ["larger", "Larger"]])) +
+      settingsRow("Reduce motion", "Turns off animations and transitions.", settingSwitch("motion", st.motion === "reduce", "Reduce motion")) +
+      '<h3 class="settings-head">Sound</h3>' +
+      settingsRow("Sound effects", "A small chime when you score well.", settingSwitch("sound", !!state.sound, "Sound effects")) +
+      '<h3 class="settings-head">Learning</h3>' +
+      settingsRow("Lesson autoplay speed", "How fast step-by-step lessons advance when you press Play.", segmented("lessonSpeed", st.lessonSpeed, [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]])) +
+      settingsRow("Game Map opens on", "", segmented("mapStart", st.mapStart, [["tech", "Technical"], ["core", "Soft skills"]])) +
+      '<h3 class="settings-head">Progress</h3>' +
+      settingsRow("Reset progress", "Clears your XP, skills and completed challenges. This can’t be undone.", settingsConfirm === "reset" ? '<div class="settings-confirm"><button type="button" class="settings-danger" data-action="reset">Yes, reset</button><button type="button" class="secondary-button" data-action="settings-cancel">Cancel</button></div>' : '<button type="button" class="secondary-button" data-action="settings-ask-reset">Reset…</button>') +
+      '<h3 class="settings-head">Account</h3>' +
+      '<div class="settings-actions"><button type="button" class="secondary-button" data-action="account-logout">Sign out</button><button type="button" class="secondary-button" data-action="logout-all">Sign out on all devices</button></div>' +
+      '</section></div>';
+  }
+  function changeSetting(key, value) {
+    if (key === "theme") setTheme(value);
+    else if (key === "sound") { state.sound = value === "on"; save(); if (state.sound) beep(); }
+    else if (key === "motion") setSetting("motion", value === "on" ? "reduce" : "system");
+    else setSetting(key, value);
+    renderSettings();
+    var focusTarget = document.querySelector('[data-setting="' + key + '"].on, [data-setting="' + key + '"][role="switch"]'); if (focusTarget) focusTarget.focus();
+  }
+  async function signOutEverywhere() {
+    try { await fetch("/api/logout-all", { method: "POST" }); } catch (e) {}
+    try { Object.keys(localStorage).forEach(function(k) { if (k.indexOf(BASE_KEY) === 0) localStorage.removeItem(k); }); } catch (e) {}
+    account = null; KEY = BASE_KEY; state = seed(); view = "home"; current = null;
+    renderAuth("login", "You’ve been signed out on every device.");
+  }
   function reset() {
-    state = freshAccount(account ? account.name : "Learner"); save(); go("home"); say("Fresh start! Pip is cheering you on.");
+    settingsConfirm = null; closeAccountModal();
+    state = freshAccount(account ? account.name : "Learner"); save(); go("home"); say("Fresh start! Your progress has been reset.");
   }
 
   document.addEventListener("click", function(e) {
     var brandLink = e.target.closest(".brand");
     if (brandLink) { var logo = brandLink.querySelector(".xp-logo"); if (logo) { logo.classList.remove("pop"); void logo.offsetWidth; logo.classList.add("pop"); setTimeout(function() { logo.classList.remove("pop"); }, 650); } }
+    var settingButton = e.target.closest("[data-setting]");
+    if (settingButton) { changeSetting(settingButton.dataset.setting, settingButton.dataset.value); return; }
+    var presetButton = e.target.closest("[data-preset]");
+    if (presetButton && profileDraft) { profileDraft.avatar = "preset:" + presetButton.dataset.preset; document.querySelectorAll("[data-preset]").forEach(function(b) { var on = b === presetButton; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); }); profilePreview(); return; }
     var accountModeButton = e.target.closest("[data-account-mode]");
     if (accountModeButton) { renderAuth(accountModeButton.dataset.accountMode); return; }
     if (e.target.id === "account-modal-root" || e.target.classList.contains("account-backdrop")) { closeAccountModal(); return; }
     var nav = e.target.closest("[data-nav]");
-    if (nav) { e.preventDefault(); go(nav.dataset.nav); return; }
+    if (nav) { e.preventDefault(); if (nav.dataset.nav === "map" && nav.closest(".sidebar")) track = getSettings().mapStart === "core" ? "core" : "tech"; go(nav.dataset.nav); return; }
     var moduleButton = e.target.closest("[data-module]");
     if (moduleButton) { e.preventDefault(); go(moduleButton.dataset.module); return; }
     var reelPick = e.target.closest("[data-reel-answer]");
@@ -828,8 +910,12 @@
     var actionButton = e.target.closest("[data-action]"), action = actionButton && actionButton.dataset.action;
     if (action === "theme") { setTheme(currentTheme() === "dark" ? "light" : "dark"); var authTheme = document.querySelector(".auth-theme"); if (authTheme) authTheme.textContent = currentTheme() === "dark" ? "☀️" : "🌙"; }
     else if (action === "profile") renderProfileModal();
+    else if (action === "settings") { settingsConfirm = null; renderSettings(); }
+    else if (action === "settings-ask-reset") { settingsConfirm = "reset"; renderSettings(); }
+    else if (action === "settings-cancel") { settingsConfirm = null; renderSettings(); }
+    else if (action === "logout-all") signOutEverywhere();
     else if (action === "profile-photo") { var fileInput = document.getElementById("profile-file"); if (fileInput) fileInput.click(); }
-    else if (action === "profile-photo-remove") { if (profileDraft) { profileDraft.avatar = ""; profilePreview(); } }
+    else if (action === "profile-photo-remove") { if (profileDraft) { profileDraft.avatar = ""; document.querySelectorAll("[data-preset]").forEach(function(b) { b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); }); profilePreview(); } }
     else if (action === "account") renderAccountModal(account ? "account" : "login");
     else if (action === "close-account") closeAccountModal();
     else if (action === "account-logout") signOut();
@@ -858,7 +944,7 @@
       if (lessonTimer) { stopLessonPlay(); draw(); }
       else if (cp) {
         var total = LESSONS[cp.id].steps.length; if (session.ls >= total - 1) session.ls = 0;
-        lessonTimer = setInterval(function() { if (session.ls >= total - 1) { stopLessonPlay(); draw(); return; } session.ls += 1; if (session.ls >= total - 1) stopLessonPlay(); draw(); }, 2200); draw();
+        lessonTimer = setInterval(function() { if (session.ls >= total - 1) { stopLessonPlay(); draw(); return; } session.ls += 1; if (session.ls >= total - 1) stopLessonPlay(); draw(); }, lessonInterval()); draw();
       }
     }
     else if (action === "lesson-done") { if (lessonItem(current)) completeLesson(lessonItem(current), false); }
@@ -897,7 +983,7 @@
   document.addEventListener("change", function(e) {
     if (e.target.id !== "profile-file" || !e.target.files || !e.target.files[0] || !profileDraft) return;
     var error = document.getElementById("profile-error");
-    shrinkPhoto(e.target.files[0]).then(function(url) { profileDraft.avatar = url; if (error) error.textContent = ""; profilePreview(); }).catch(function(problem) { if (error) error.textContent = problem.message; });
+    shrinkPhoto(e.target.files[0]).then(function(url) { profileDraft.avatar = url; if (error) error.textContent = ""; document.querySelectorAll("[data-preset]").forEach(function(b) { b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); }); profilePreview(); }).catch(function(problem) { if (error) error.textContent = problem.message; });
     e.target.value = "";
   });
   document.addEventListener("keydown", function(e) {
@@ -908,6 +994,7 @@
     if (e.target.id === "auth-form") { e.preventDefault(); submitAccount(e.target); }
     if (e.target.id === "profile-form") { e.preventDefault(); submitProfile(e.target); }
   });
+  applySettings(getSettings());
   syncThemeUi();
   initAccount();
 })(); 

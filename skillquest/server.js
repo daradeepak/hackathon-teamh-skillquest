@@ -20,6 +20,8 @@ const SESSION_TTL = 12 * 60 * 60 * 1000;
 const MAX_BODY = 300 * 1024;
 const MAX_AVATAR = 60 * 1024; /* characters of a small data URL; the browser shrinks photos before sending */
 const AVATAR_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
+const AVATAR_PRESETS = new Set(["fox", "owl", "panda", "cat", "robot", "rocket", "koala", "octopus"]);
+function validAvatar(value) { const preset = /^preset:([a-z]+)$/.exec(value); return preset ? AVATAR_PRESETS.has(preset[1]) : value.length <= MAX_AVATAR && AVATAR_PATTERN.test(value); }
 const contentTypes = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".ico": "image/x-icon", ".webp": "image/webp"
@@ -99,6 +101,7 @@ async function currentUser(request) {
 
 /* ---------- rate limiting (per instance, in memory) ---------- */
 const attempts = new Map();
+const REGISTER_LIMIT = Number(process.env.REGISTER_LIMIT_PER_HOUR) || 10;
 function rateLimit(key, limit, windowMs) {
   const now = Date.now(), entry = attempts.get(key);
   if (!entry || entry.resetAt < now) { attempts.set(key, { count: 1, resetAt: now + windowMs }); return; }
@@ -119,7 +122,7 @@ async function handleApi(request, response, route) {
   }
 
   if (route === "/api/register" && method === "POST") {
-    rateLimit("register:" + clientIp(request), 10, 60 * 60 * 1000);
+    rateLimit("register:" + clientIp(request), REGISTER_LIMIT, 60 * 60 * 1000);
     const body = await readJson(request);
     const name = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 40);
     const email = String(body.email || "").trim().toLowerCase();
@@ -157,11 +160,16 @@ async function handleApi(request, response, route) {
 
   /* everything below needs a signed-in player */
   const user = await currentUser(request);
-  if (!user && route.startsWith("/api/") && ["/api/me", "/api/progress", "/api/profile", "/api/leaderboard"].includes(route)) {
+  if (!user && route.startsWith("/api/") && ["/api/me", "/api/progress", "/api/profile", "/api/leaderboard", "/api/logout-all"].includes(route)) {
     return sendJson(response, 401, { error: NOT_SIGNED_IN }, { "Set-Cookie": clearSessionCookie() });
   }
 
   if (route === "/api/me" && method === "GET") return sendJson(response, 200, { user: publicUser(user) });
+
+  if (route === "/api/logout-all" && method === "POST") {
+    await pool.query("DELETE FROM sessions WHERE user_id = $1", [user.id]);
+    return sendJson(response, 200, { ok: true }, { "Set-Cookie": clearSessionCookie() });
+  }
 
   if (route === "/api/progress" && method === "POST") {
     const body = await readJson(request);
@@ -180,7 +188,7 @@ async function handleApi(request, response, route) {
     }
     if (body.avatar !== undefined) {
       avatar = String(body.avatar || "");
-      if (avatar && (avatar.length > MAX_AVATAR || !AVATAR_PATTERN.test(avatar))) return sendJson(response, 400, { error: "Use a PNG, JPEG or WebP photo." });
+      if (avatar && !validAvatar(avatar)) return sendJson(response, 400, { error: "Use a PNG, JPEG or WebP photo, or one of the preset avatars." });
     }
     const { rows } = await pool.query("UPDATE users SET name = $2, avatar = $3, updated_at = now() WHERE id = $1 RETURNING *", [user.id, name, avatar]);
     return sendJson(response, 200, { user: publicUser(rows[0]) });
