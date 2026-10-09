@@ -129,7 +129,8 @@ A health check at `GET /api/health` reports whether the database is reachable. T
 | Prem | UI layout of the application and ideas |
 | Lalitha Akhila | The idea, improving the user experience, and the product name |
 | Subhrakeshi Pati | The idea, improving the user experience, and the product name |
-| Margarida | *To be filled in by the team* |
+
+Some commits come from a shared "Apty Admin" GitHub account, used by Sonali, Tarun, Vivek and Deepak.
 
 ## 7. Credits and licences
 
