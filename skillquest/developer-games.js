@@ -193,5 +193,114 @@ window.DEVQUEST_CONTENT = {
       prompt: "Work out what this prints, then type it exactly (separate values with a space).",
       code: ["const nums = [1, 2, 3];", "const out = nums.map(n => n * 2);", "console.log(out.length, out[2]);"], ask: "It prints:", blanks: [["3 6"]],
       explain: "map builds [2, 4, 6]. Its length is 3 and the item at index 2 is 6." }
-  ]
+  ],
+  /* Interactive lessons, keyed by the challenge they prepare you for.
+     "compare" lessons let the learner switch between versions and see code + result; "steps" lessons walk through code one step at a time. */
+  lessons: {
+    "html-hunt-bug": { title: "Labels and alt text", kind: "compare", intro: "Screen readers announce what your HTML says. Switch between three versions and see what changes.",
+      base: "input { padding: 6px; width: 180px; } label { display: block; margin-bottom: 4px; font-weight: 600; } img { display: block; width: 56px; height: 56px; }",
+      html: "<label>Email</label><input type=\"email\">",
+      variants: [
+        { label: "No label link", code: "<label>Email</label>\n<input type=\"email\">", page: "<label>Email</label><input type=\"email\">", say: "“Edit text.”", caption: "Try clicking the word Email. Nothing happens, because the label isn't connected, and a screen reader can't name the field." },
+        { label: "Linked label", code: "<label for=\"email\">Email</label>\n<input id=\"email\" type=\"email\">", page: "<label for=\"email\">Email</label><input id=\"email\" type=\"email\">", say: "“Email, edit text.”", caption: "for and id connect the two. Click the word Email and the field gets focus. Screen readers read the name out." },
+        { label: "Image alt text", code: "<img src=\"logo.png\"\n     alt=\"XPaddition logo\">", page: "<img alt=\"XPaddition logo\" src=\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23705ce8'/%3E%3Ctext x='32' y='41' font-family='Arial' font-weight='800' font-size='24' text-anchor='middle' fill='white'%3EXP%2B%3C/text%3E%3C/svg%3E\">", say: "“Image, XPaddition logo.”", caption: "alt describes an image to people who can't see it. Without it, a screen reader may read out the file name instead." }
+      ], key: "Every input needs a linked label, and every meaningful image needs alt text." },
+    "html-build-page": { title: "Anatomy of an HTML page", kind: "steps", intro: "Step through a tiny page and see what each part is for.",
+      code: ["<!DOCTYPE html>", "<html lang=\"en\">", "  <head>", "    <title>My page</title>", "  </head>", "  <body>", "    <h1>Hello!</h1>", "  </body>", "</html>"],
+      steps: [
+        { focus: [0], state: [["Browser mode", "Modern standards"]], say: "The doctype tells the browser to use modern HTML rules. It always comes first." },
+        { focus: [1], state: [["Language", "English"]], say: "<html> wraps the whole page. lang helps screen readers and translation tools." },
+        { focus: [2, 3, 4], state: [["Tab title", "My page"], ["Shown on page?", "No"]], say: "<head> holds information about the page, like its title. It is not drawn on the page." },
+        { focus: [5, 6, 7], state: [["On screen", "Hello!"]], say: "<body> holds everything people actually see." },
+        { focus: [8], state: [["Document", "Complete"]], say: "The closing </html> ends the document." }
+      ], key: "The order is: doctype, html, head, body, then close html." },
+    "html-match-tags": { title: "Tags that carry meaning", kind: "compare", intro: "Different tags can look the same but mean very different things. Switch between them.",
+      base: "nav, .fake { background: #eef2ff; padding: 8px; } a { margin-right: 10px; } ul { margin: 0; }",
+      html: "<div class=\"fake\"><a href=\"#\">Home</a><a href=\"#\">About</a></div>",
+      variants: [
+        { label: "Just a div", code: "<div class=\"menu\">\n  <a href=\"#\">Home</a>\n  <a href=\"#\">About</a>\n</div>", page: "<div class=\"fake\"><a href=\"#\">Home</a><a href=\"#\">About</a></div>", say: "“Home, link. About, link.”", caption: "It looks fine, but nothing tells the browser this is the site menu." },
+        { label: "<nav>", code: "<nav>\n  <a href=\"#\">Home</a>\n  <a href=\"#\">About</a>\n</nav>", page: "<nav><a href=\"#\">Home</a><a href=\"#\">About</a></nav>", say: "“Navigation. Home, link. About, link.”", caption: "<nav> is a landmark. Screen reader users can jump straight to it." },
+        { label: "<button>", code: "<button>Save</button>", page: "<button>Save</button>", say: "“Save, button.”", caption: "Try pressing Tab, then Enter. A button is focusable and works with the keyboard for free. A clickable div does not." },
+        { label: "<ul>", code: "<ul>\n  <li>One</li>\n  <li>Two</li>\n</ul>", page: "<ul><li>One</li><li>Two</li></ul>", say: "“List, 2 items.”", caption: "Lists tell assistive tech how many items there are and where each one starts." }
+      ], key: "Choose tags for what things mean, not for how they look." },
+    "html-complete-link": { title: "Links and their attributes", kind: "compare", intro: "A link is just <a> plus attributes. See what each attribute adds.",
+      base: "a { font-size: 16px; } p { color: #555; font-size: 13px; margin-top: 12px; }",
+      html: "<a href=\"#\">Visit</a>",
+      variants: [
+        { label: "href", code: "<a href=\"https://example.com\">Visit</a>", page: "<a href=\"#\">Visit</a><p>Goes to the address in href.</p>", say: "“Visit, link.”", caption: "href holds the destination. Without it, <a> is just text and not a link." },
+        { label: "target", code: "<a href=\"https://example.com\"\n   target=\"_blank\">Visit</a>", page: "<a href=\"#\">Visit ↗</a><p>Opens in a new tab.</p>", say: "“Visit, link.”", caption: "target=\"_blank\" opens the link in a new tab. On its own, the new page can reach back to yours." },
+        { label: "rel", code: "<a href=\"https://example.com\"\n   target=\"_blank\"\n   rel=\"noopener\">Visit</a>", page: "<a href=\"#\">Visit ↗</a><p>New tab, safely cut off from this page.</p>", say: "“Visit, link.”", caption: "rel=\"noopener\" cuts that connection, so the new page can't control yours." }
+      ], key: "href is the address, target controls where it opens, and rel=\"noopener\" keeps new tabs safe." },
+    "css-centre": { title: "Centring with flexbox", kind: "compare", intro: "Flexbox lines items up along two directions. Switch between rules and watch the blue box move.",
+      base: ".container { width: 240px; height: 130px; background: #e5e7eb; } .box { width: 50px; height: 50px; background: #2f5fd0; }",
+      html: "<div class=\"container\"><div class=\"box\"></div></div>",
+      variants: [
+        { label: "Normal flow", code: ".container {\n}", css: "", caption: "With no rules, the box sits in the top-left corner like any block." },
+        { label: "justify-content", code: ".container {\n  display: flex;\n  justify-content: center;\n}", css: ".container { display: flex; justify-content: center; }", caption: "display: flex turns on flexbox. justify-content centres along the main axis, left to right." },
+        { label: "+ align-items", code: ".container {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n}", css: ".container { display: flex; justify-content: center; align-items: center; }", caption: "align-items centres across it, top to bottom. Together they centre the box perfectly." }
+      ], key: "justify-content works left to right, align-items works top to bottom." },
+    "css-row-gap": { title: "Rows and gaps", kind: "compare", intro: "See how three cards go from a stack to a spaced-out row.",
+      base: ".card { width: 48px; height: 48px; background: #2f5fd0; color: #fff; display: grid; place-items: center; font: 700 16px sans-serif; } .cards { background: #f3f4f6; padding: 8px; }",
+      html: "<div class=\"cards\"><div class=\"card\">1</div><div class=\"card\">2</div><div class=\"card\">3</div></div>",
+      variants: [
+        { label: "Stacked", code: ".cards {\n}", css: "", caption: "Block elements stack top to bottom by default." },
+        { label: "display: flex", code: ".cards {\n  display: flex;\n}", css: ".cards { display: flex; }", caption: "display: flex puts the children side by side. They touch because there is no space yet." },
+        { label: "+ gap", code: ".cards {\n  display: flex;\n  gap: 16px;\n}", css: ".cards { display: flex; gap: 16px; }", caption: "gap adds space between children only. No extra margins to clean up at the ends." }
+      ], key: "display: flex makes a row, and gap spaces the items evenly." },
+    "css-hunt-bug": { title: "How CSS reads your rules", kind: "compare", intro: "Browsers quietly ignore CSS they can't understand. Compare these three rules.",
+      base: ".card { display: inline-block; border: 1px solid #bbb; } ",
+      html: "<div class=\"card\">Hello</div>",
+      variants: [
+        { label: "Correct", code: ".card {\n  padding: 16px;\n  color: #c0262d;\n}", css: ".card { padding: 16px; color: #c0262d; }", caption: "Padding and the red text both apply." },
+        { label: "Missing semicolon", code: ".card {\n  padding: 16px\n  color: #c0262d;\n}", css: ".card { padding: 16px\n  color: #c0262d; }", caption: "Without the semicolon the browser reads one broken line and drops both declarations. Nothing is styled." },
+        { label: "Misspelled property", code: ".card {\n  padding: 16px;\n  colour: #c0262d;\n}", css: ".card { padding: 16px; colour: #c0262d; }", caption: "The padding works, but colour isn't a real property, so the text stays black. CSS spells it color." }
+      ], key: "End every declaration with a semicolon and check property spelling. CSS fails silently." },
+    "css-box-model": { title: "The box model", kind: "compare", intro: "Every element is a box with layers. Add them one by one.",
+      base: ".wrap { display: inline-block; background: #e5e7eb; } .b { width: 100px; height: 44px; background: #bcd0ff; display: grid; place-items: center; font-size: 12px; }",
+      html: "<div class=\"wrap\"><div class=\"b\">content</div></div>",
+      variants: [
+        { label: "Content", code: ".b {\n  width: 100px;\n  height: 44px;\n}", css: "", caption: "The content is the innermost layer." },
+        { label: "+ padding", code: ".b {\n  padding: 16px;\n}", css: ".b { padding: 16px; }", caption: "Padding adds space inside the box, around the content." },
+        { label: "+ border", code: ".b {\n  padding: 16px;\n  border: 6px solid #2f5fd0;\n}", css: ".b { padding: 16px; border: 6px solid #2f5fd0; }", caption: "The border wraps the padding." },
+        { label: "+ margin", code: ".b {\n  padding: 16px;\n  border: 6px solid #2f5fd0;\n  margin: 20px;\n}", css: ".b { padding: 16px; border: 6px solid #2f5fd0; margin: 20px; }", caption: "Margin is space outside the border, pushing other things away. The grey area shows it." }
+      ], key: "From the outside in: margin, border, padding, content." },
+    "js-fix-function": { title: "Loops and off-by-one bugs", kind: "steps", intro: "Watch a loop add up three prices, and see where it goes wrong.",
+      code: ["const prices = [4, 7, 2];", "let sum = 0;", "for (let i = 0; i <= prices.length; i++) {", "  sum += prices[i];", "}"],
+      steps: [
+        { focus: [0, 1], state: [["prices", "[4, 7, 2]"], ["length", "3"], ["sum", "0"]], say: "There are 3 prices. The valid positions are 0, 1 and 2." },
+        { focus: [2, 3], state: [["i", "0"], ["prices[i]", "4"], ["sum", "4"]], say: "i is 0, so it adds 4." },
+        { focus: [2, 3], state: [["i", "1"], ["prices[i]", "7"], ["sum", "11"]], say: "i is 1, so it adds 7." },
+        { focus: [2, 3], state: [["i", "2"], ["prices[i]", "2"], ["sum", "13"]], say: "i is 2, so it adds 2. That is every item." },
+        { focus: [2, 3], state: [["i", "3"], ["prices[i]", "undefined"], ["sum", "NaN"]], say: "With <=, the loop runs once more with i = 3. There is no item there, so the sum becomes NaN." },
+        { focus: [2], state: [["i <= 3", "true (bug)"], ["i < 3", "false (fix)"]], say: "Use i < prices.length so the loop stops right after the last item." }
+      ], key: "Positions start at 0, so the last one is length − 1. Loop with < length." },
+    "js-write-function": { title: "Functions and the remainder operator", kind: "steps", intro: "See how isEven decides, one call at a time.",
+      code: ["function isEven(n) {", "  return n % 2 === 0;", "}", "isEven(7);  isEven(6);"],
+      steps: [
+        { focus: [3], state: [["n", "7"]], say: "Call isEven with 7." },
+        { focus: [1], state: [["7 % 2", "1"]], say: "% gives the remainder after dividing. 7 ÷ 2 leaves 1." },
+        { focus: [1], state: [["1 === 0", "false"], ["returns", "false"]], say: "A remainder of 0 means even. Here it is 1, so the answer is false." },
+        { focus: [3, 1], state: [["n", "6"], ["6 % 2", "0"], ["returns", "true"]], say: "6 ÷ 2 leaves 0, so 6 is even and the function returns true." },
+        { focus: [1], state: [["0 % 2", "0"], ["-4 % 2", "-0 (equals 0)"], ["returns", "true"]], say: "Zero and negative even numbers work too." }
+      ], key: "n % 2 === 0 is true for every even number. Functions send their answer back with return." },
+    "js-run-order": { title: "The event loop", kind: "steps", intro: "JavaScript runs one thing at a time. Step through to see who goes first.",
+      code: ["console.log(\"A\");", "setTimeout(() => console.log(\"B\"), 0);", "Promise.resolve().then(() => console.log(\"C\"));", "console.log(\"D\");"],
+      steps: [
+        { focus: [0], state: [["Now running", "log A"], ["Microtasks", "empty"], ["Timers", "empty"], ["Console", "A"]], say: "Normal code runs straight away, so A prints." },
+        { focus: [1], state: [["Now running", "setTimeout"], ["Microtasks", "empty"], ["Timers", "log B (waiting)"], ["Console", "A"]], say: "setTimeout hands its callback to the timers. It will run later." },
+        { focus: [2], state: [["Now running", "Promise.then"], ["Microtasks", "log C"], ["Timers", "log B (waiting)"], ["Console", "A"]], say: "The promise callback joins the microtask queue, which is served before timers." },
+        { focus: [3], state: [["Now running", "log D"], ["Microtasks", "log C"], ["Timers", "log B (waiting)"], ["Console", "A D"]], say: "The last normal line prints D." },
+        { focus: [2], state: [["Now running", "log C"], ["Microtasks", "empty"], ["Timers", "log B (waiting)"], ["Console", "A D C"]], say: "Now the main code is finished, so microtasks run first: C." },
+        { focus: [1], state: [["Now running", "log B"], ["Microtasks", "empty"], ["Timers", "empty"], ["Console", "A D C B"]], say: "Finally the timer callback runs: B." }
+      ], key: "Order: normal code, then promise callbacks, then timers." },
+    "js-predict-type": { title: "How map builds a new array", kind: "steps", intro: "Watch map visit each number and collect the results.",
+      code: ["const nums = [1, 2, 3];", "const out = nums.map(n => n * 2);", "console.log(out.length, out[2]);"],
+      steps: [
+        { focus: [0], state: [["nums", "[1, 2, 3]"]], say: "We start with three numbers." },
+        { focus: [1], state: [["n", "1"], ["out so far", "[2]"]], say: "map calls the function on each item and collects the results. 1 becomes 2." },
+        { focus: [1], state: [["n", "2"], ["out so far", "[2, 4]"]], say: "2 becomes 4." },
+        { focus: [1], state: [["n", "3"], ["out so far", "[2, 4, 6]"]], say: "3 becomes 6. nums itself is unchanged." },
+        { focus: [2], state: [["out.length", "3"], ["out[2]", "6"], ["prints", "3 6"]], say: "Positions start at 0, so out[2] is the third item: 6. console.log prints both values." }
+      ], key: "map returns a new array the same length as the original." }
+  }
 };

@@ -1,6 +1,6 @@
 (function() {
   "use strict";
-  var D = window.DEVQUEST_CONTENT, SKILLS = D.skills, SCEN = D.scenarios, TECH = D.techSkills, CHAL = D.challenges, root = document.getElementById("app-main");
+  var D = window.DEVQUEST_CONTENT, SKILLS = D.skills, SCEN = D.scenarios, TECH = D.techSkills, CHAL = D.challenges, LESSONS = D.lessons, root = document.getElementById("app-main");
   var label = document.getElementById("page-label"), toast = document.getElementById("toast");
   var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "core", hint = false;
   var account = null, accountMode = "login";
@@ -19,16 +19,16 @@
   ];
   function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) } }; }
   var AVATAR_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
-  function fresh() { return { choice: null, lines: [], order: [], pairs: {}, pending: null, fill: [], code: "", busy: false, result: null }; }
+  function fresh() { return { choice: null, lines: [], order: [], pairs: {}, pending: null, fill: [], code: "", busy: false, stage: "play", lv: 0, seen: [0], ls: 0, result: null }; }
   function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
   function blankProgress(name) {
-    return { name: name || "Learner", avatar: "", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, daily: { date: dayKey(), actions: [], claimed: false },
+    return { name: name || "Learner", avatar: "", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, lessons: {}, daily: { date: dayKey(), actions: [], claimed: false },
       reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 } };
   }
   /* Accepts saved progress from this or an older version and keeps only values that are still valid. */
   function normalize(p, name) {
     if (!p || typeof p !== "object" || Array.isArray(p)) return null;
-    var base = blankProgress(name || p.name), skills = zeroSkills(), chosen = {}, tech = {};
+    var base = blankProgress(name || p.name), skills = zeroSkills(), chosen = {}, tech = {}, learned = {};
     SKILLS.concat(TECH).forEach(function(k) { var v = p.skills && Number(p.skills[k.id]); if (isFinite(v) && v > 0) skills[k.id] = Math.min(Math.floor(v), 1000000); });
     if (p.scenarios && typeof p.scenarios === "object") Object.keys(p.scenarios).forEach(function(id) {
       var sc = SCEN_BY_ID[id], c = p.scenarios[id];
@@ -37,7 +37,8 @@
     if (p.tech && typeof p.tech === "object") Object.keys(p.tech).forEach(function(id) {
       var v = Number(p.tech[id]); if (CHAL_BY_ID[id] && isFinite(v) && v > 0) tech[id] = Math.min(100, Math.round(v));
     });
-    return Object.assign(base, { avatar: AVATAR_RE.test(p.avatar) ? p.avatar : "", tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
+    if (p.lessons && typeof p.lessons === "object") Object.keys(p.lessons).forEach(function(id) { if (LESSONS[id] && p.lessons[id]) learned[id] = true; });
+    return Object.assign(base, { lessons: learned, avatar: AVATAR_RE.test(p.avatar) ? p.avatar : "", tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
       reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}) });
   }
   function seed() { return blankProgress("Learner"); }
@@ -244,17 +245,22 @@
     var pool = skillId ? CHAL.filter(function(x) { return x.skill === skillId; }) : CHAL;
     return (pool.find(function(x) { return !techDone(x.id); }) || pool.find(function(x) { return techBest(x.id) < 100; }) || pool[0]).id;
   }
-  function open(id) {
+  var curSkill = TECH[0].id, lessonTimer = null;
+  function stopLessonPlay() { if (lessonTimer) clearInterval(lessonTimer); lessonTimer = null; }
+  function open(id, forceLesson) {
     if (!SCEN_BY_ID[id] && !CHAL_BY_ID[id]) return;
     track = CHAL_BY_ID[id] ? "tech" : "core";
+    stopLessonPlay();
     current = id; view = "game"; session = fresh();
+    if (CHAL_BY_ID[id]) { curSkill = CHAL_BY_ID[id].skill; if (forceLesson || !state.lessons[id]) session.stage = "learn"; }
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
   var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges", "anim", "sort"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
-  function go(where) { if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function go(where) { stopLessonPlay(); if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function draw() {
     if (view === "home") { label.textContent = "Home"; home(); if (LAB_ENABLED) root.insertAdjacentHTML("afterbegin", dailyBanner()); }
     else if (view === "map") { label.textContent = "Game Map"; track === "tech" ? techMap() : map(); }
+    else if (view === "techskill") { label.textContent = "Game Map · " + SKILL_BY_ID[curSkill].name; techSkillPage(); }
     else if (view === "leaderboard") { label.textContent = "Leaderboard"; leaderboardPage(); }
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
@@ -265,7 +271,7 @@
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && view === "sort")); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && view === "sort")); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     syncAccountUi();
     var sound = document.querySelector("[data-action='sound']");
@@ -583,11 +589,67 @@
       (ans ? '<p class="sk-chosen"><b>Answer:</b> ' + esc(ans) + '</p>' : "") + '<div class="sk-insight"><span class="sk-eyebrow">WHY</span><p>' + esc(c.explain) + '</p></div>' +
       '<div class="sk-gains">' + (r.gain > 0 ? '<span class="sk-chip">+' + r.gain + ' ' + esc(SKILL_BY_ID[c.skill].name) + '</span>' : '<span class="sk-chip sk-chip-muted">' + (r.score >= r.best ? "No new XP · best score " + r.best + "%" : "Best score stays " + r.best + "%") + '</span>') + '</div>' +
       (r.levelUps.length ? '<ul class="sk-levelups">' + r.levelUps.map(function(t) { return '<li>🎉 ' + esc(t) + '</li>'; }).join("") + '</ul>' : "") +
-      '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue-tech">Next challenge →</button><button type="button" class="secondary-button" data-action="replay">Try again</button><button type="button" class="secondary-button" data-nav="map">Back to Game Map</button></div></div>';
+      '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue-tech">Next challenge →</button><button type="button" class="secondary-button" data-action="replay">Try again</button><button type="button" class="secondary-button" data-nav="techskill">Back to ' + esc(SKILL_BY_ID[c.skill].name) + '</button></div></div>';
+  }
+  /* ---------- interactive lessons ---------- */
+  function lessonDone(L) {
+    if (L.kind === "compare") return session.seen.length >= L.variants.length;
+    return session.ls >= L.steps.length - 1;
+  }
+  function lessonDoc(L, v) {
+    return '<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:10px;font-family:sans-serif;font-size:14px}' + L.base + (v.css || "") + '</style>' + (v.page || L.html);
+  }
+  function lessonBody(L) {
+    if (L.kind === "compare") {
+      var v = L.variants[session.lv] || L.variants[0];
+      return '<div class="sk-learn-tabs" role="tablist" aria-label="Versions">' + L.variants.map(function(x, i) {
+        return '<button type="button" role="tab" aria-selected="' + (i === session.lv) + '" class="sk-learn-tab ' + (i === session.lv ? "on " : "") + (has(session.seen, i) ? "seen" : "") + '" data-lv="' + i + '">' + esc(x.label) + '</button>';
+      }).join("") + '</div><div class="sk-learn-grid"><pre class="sk-code"><code>' + esc(v.code) + '</code></pre><div class="sk-learn-result"><iframe class="sk-preview sk-learn-preview" title="Result preview" sandbox="allow-same-origin" srcdoc="' + esc(lessonDoc(L, v)) + '"></iframe>' +
+        (v.say ? '<p class="sk-say"><span>🔊 A screen reader says</span> ' + esc(v.say) + '</p>' : "") + '</div></div><p class="sk-learn-caption">' + esc(v.caption) + '</p><p class="sk-hint">' + (lessonDone(L) ? "You've seen every version." : "Tap each version to see the difference (" + session.seen.length + " of " + L.variants.length + ").") + '</p>';
+    }
+    var st = L.steps[Math.min(session.ls, L.steps.length - 1)], last = session.ls >= L.steps.length - 1;
+    return '<div class="sk-learn-grid"><div class="sk-codelines sk-learn-lines">' + L.code.map(function(line, i) {
+      return '<div class="sk-learnline ' + (has(st.focus, i) ? "focus" : "") + '"><span>' + (i + 1) + '</span><code>' + esc(line) + '</code></div>';
+    }).join("") + '</div><div class="sk-learn-state">' + st.state.map(function(row) { return '<div><small>' + esc(row[0]) + '</small><strong>' + esc(row[1]) + '</strong></div>'; }).join("") + '</div></div>' +
+      '<p class="sk-learn-caption" aria-live="polite">' + esc(st.say) + '</p><div class="sk-stepper"><button type="button" class="secondary-button" data-action="lesson-prev"' + (session.ls === 0 ? " disabled" : "") + '>← Back</button>' +
+      '<span class="sk-dots" aria-hidden="true">' + L.steps.map(function(_, i) { return '<i class="' + (i === session.ls ? "on" : (i < session.ls ? "past" : "")) + '"></i>'; }).join("") + '</span>' +
+      '<button type="button" class="secondary-button" data-action="lesson-play">' + (lessonTimer ? "⏸ Pause" : "▶ Play") + '</button><button type="button" class="primary-button" data-action="lesson-next"' + (last ? " disabled" : "") + '>Next →</button></div><p class="sk-hint">Step ' + (session.ls + 1) + ' of ' + L.steps.length + '</p>';
+  }
+  function lessonScreen(c) {
+    var L = LESSONS[c.id], learned = !!state.lessons[c.id], ready = lessonDone(L);
+    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="techskill">← Back to ' + esc(SKILL_BY_ID[c.skill].name) + '</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · LEARN FIRST</span><h1>📖 ' + esc(L.title) + '</h1><p class="sk-situation">' + esc(L.intro) + '</p>' + lessonBody(L) +
+      '<div class="sk-insight sk-key"><span class="sk-eyebrow">KEY IDEA</span><p>' + esc(L.key) + '</p></div><div class="sk-actions"><button type="button" class="primary-button" data-action="lesson-done"' + (ready ? "" : " disabled") + '>' + (learned ? "Start the challenge →" : "Got it — start the challenge →") + '</button><button type="button" class="secondary-button" data-action="lesson-skip">' + (learned ? "Skip" : "Skip lesson") + '</button></div>' +
+      (learned ? "" : '<p class="sk-hint">Finish the lesson to earn +10 ' + esc(SKILL_BY_ID[c.skill].name) + ' XP.</p>') + '</section></div>';
+  }
+  function completeLesson(c, skipped) {
+    stopLessonPlay();
+    if (!skipped && lessonDone(LESSONS[c.id]) && !state.lessons[c.id]) {
+      var before = levelInfo(state.skills[c.skill], SKILL_AT).n, playerBefore = playerLevel().n;
+      state.lessons[c.id] = true; state.skills[c.skill] += 10; state.xp += 10;
+      var msg = "Concept learned! +10 " + SKILL_BY_ID[c.skill].name + " XP";
+      if (levelInfo(state.skills[c.skill], SKILL_AT).n > before) msg += " · " + SKILL_BY_ID[c.skill].name + " reached Level " + levelInfo(state.skills[c.skill], SKILL_AT).n;
+      else if (playerLevel().n > playerBefore) msg += " · Player Level " + playerLevel().n + "!";
+      save(); say(msg);
+    }
+    session.stage = "play"; draw();
+  }
+  function techSkillPage() {
+    var k = SKILL_BY_ID[curSkill], info = levelInfo(state.skills[k.id], SKILL_AT), list = CHAL.filter(function(x) { return x.skill === k.id; });
+    var cleared = list.filter(function(x) { return techDone(x.id); }).length, learnedCount = list.filter(function(x) { return state.lessons[x.id]; }).length;
+    var kindLabel = { tapLine: "Tap the bugs", arrange: "Put in order", match: "Match pairs", fill: "Type it in", live: "Live CSS editor", run: "Code runner" };
+    root.innerHTML = '<div class="sk"><button type="button" class="back-link" data-nav="map">← Back to Game Map</button><section class="sk-head"><div><span class="sk-eyebrow">TECHNICAL SKILL</span><h1>' + esc(k.name) + '</h1><p>' + esc(k.desc) + '</p></div><span class="sk-icon sk-icon-lg">' + skillIcon(k.id) + '</span></section>' +
+      '<section class="sk-player"><div class="sk-player-level"><span class="sk-eyebrow">SKILL LEVEL</span><strong>' + info.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>' + state.skills[k.id] + ' XP</h2><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></div><div class="sk-bar" role="progressbar" aria-label="Progress to the next ' + esc(k.name) + ' level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + info.pct + '"><i style="width:' + info.pct + '%"></i></div><p>' + learnedCount + ' of ' + list.length + ' concepts learned · ' + cleared + ' of ' + list.length + ' challenges cleared</p></div></section>' +
+      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">LEARN, THEN PLAY</span><h2>Your ' + esc(k.name) + ' path</h2></div><button class="primary-button" data-action="continue-tech">Continue →</button></div><ol class="sk-path">' +
+      list.map(function(c, i) {
+        var L = LESSONS[c.id], learned = !!state.lessons[c.id], best = techBest(c.id);
+        return '<li class="sk-pathrow"><span class="sk-pathnum">' + (i + 1) + '</span><div class="sk-pathbody"><button type="button" class="sk-pathbtn" data-lesson="' + c.id + '"><span class="sk-pathtag">' + (learned ? "✓ LEARNED" : "📖 LESSON") + '</span><strong>' + esc(L.title) + '</strong><small>' + (L.kind === "steps" ? "Step-by-step visual" : "Compare and explore") + '</small></button>' +
+          '<span class="sk-patharrow" aria-hidden="true">→</span><button type="button" class="sk-pathbtn" data-challenge="' + c.id + '"><span class="sk-pathtag">' + (best >= 60 ? "✓ " + best + "%" : "🎮 CHALLENGE") + '</span><strong>' + c.emoji + ' ' + esc(c.title) + '</strong><small>' + kindLabel[c.kind] + ' · up to ' + c.xp + ' XP</small></button></div></li>';
+      }).join("") + '</ol><p class="sk-note">Each lesson takes about a minute and earns +10 XP. Then try the challenge to show what you learned.</p></section></div>';
   }
   function techScreen(c) {
-    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Game Map</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · CHALLENGE</span><h1>' + c.emoji + ' ' + esc(c.title) + '</h1><p class="sk-situation">' + esc(c.prompt) + '</p>' +
-      (session.result ? techResult(c) : techBody(c) + '<div class="sk-actions"><button type="button" class="primary-button" data-action="submit"' + (techReady(c) ? "" : " disabled") + '>Lock it in →</button>' + (c.kind === "arrange" && session.order.length ? '<button type="button" class="secondary-button" data-action="clear-order">Clear</button>' : "") + '</div>') + '</section></div>';
+    if (session.stage === "learn") { lessonScreen(c); return; }
+    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="techskill">← Back to ' + esc(SKILL_BY_ID[c.skill].name) + '</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · CHALLENGE</span><h1>' + c.emoji + ' ' + esc(c.title) + '</h1><p class="sk-situation">' + esc(c.prompt) + '</p>' +
+      (session.result ? techResult(c) : '<button type="button" class="sk-review" data-action="review-lesson">📖 Review the concept</button>' + techBody(c) + '<div class="sk-actions"><button type="button" class="primary-button" data-action="submit"' + (techReady(c) ? "" : " disabled") + '>Lock it in →</button>' + (c.kind === "arrange" && session.order.length ? '<button type="button" class="secondary-button" data-action="clear-order">Clear</button>' : "") + '</div>') + '</section></div>';
     if (c.kind === "live" && !session.result) setupLive(c);
   }
   function techScore(c) {
@@ -672,7 +734,11 @@
     var simPick = e.target.closest("[data-sim-choice]");
     if (simPick) { chooseSim(Number(simPick.dataset.simChoice)); return; }
     var techButton = e.target.closest("[data-tech]");
-    if (techButton) { open(nextChallenge(techButton.dataset.tech)); return; }
+    if (techButton) { curSkill = techButton.dataset.tech; track = "tech"; go("techskill"); return; }
+    var lessonButton = e.target.closest("[data-lesson]");
+    if (lessonButton) { open(lessonButton.dataset.lesson, true); return; }
+    var challengeButton = e.target.closest("[data-challenge]");
+    if (challengeButton) { open(challengeButton.dataset.challenge); return; }
     var skillButton = e.target.closest("[data-skill]");
     if (skillButton) { open(nextScenario(skillButton.dataset.skill)); return; }
     var actionButton = e.target.closest("[data-action]"), action = actionButton && actionButton.dataset.action;
@@ -698,12 +764,27 @@
     else if (action === "sim-restart") { state.simulator = { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 }; save(); draw(); }
     else if (action === "core") { track = "core"; go("map"); }
     else if (action === "tech") { track = "tech"; go("map"); }
-    else if (action === "continue-tech") open(nextChallenge(CHAL_BY_ID[current] ? CHAL_BY_ID[current].skill : null));
+    else if (action === "continue-tech") open(nextChallenge(CHAL_BY_ID[current] ? CHAL_BY_ID[current].skill : (view === "techskill" ? curSkill : null)));
     else if (action === "clear-order") { session.order = []; draw(); }
+    else if (action === "review-lesson") { stopLessonPlay(); session.stage = "learn"; session.lv = 0; session.seen = [0]; session.ls = 0; draw(); }
+    else if (action === "lesson-prev") { stopLessonPlay(); if (session.ls > 0) session.ls -= 1; draw(); }
+    else if (action === "lesson-next") { stopLessonPlay(); var cl = CHAL_BY_ID[current]; if (cl && session.ls < LESSONS[cl.id].steps.length - 1) session.ls += 1; draw(); }
+    else if (action === "lesson-play") {
+      var cp = CHAL_BY_ID[current];
+      if (lessonTimer) { stopLessonPlay(); draw(); }
+      else if (cp) {
+        var total = LESSONS[cp.id].steps.length; if (session.ls >= total - 1) session.ls = 0;
+        lessonTimer = setInterval(function() { if (session.ls >= total - 1) { stopLessonPlay(); draw(); return; } session.ls += 1; if (session.ls >= total - 1) stopLessonPlay(); draw(); }, 2200); draw();
+      }
+    }
+    else if (action === "lesson-done") { if (CHAL_BY_ID[current]) completeLesson(CHAL_BY_ID[current], false); }
+    else if (action === "lesson-skip") { if (CHAL_BY_ID[current]) completeLesson(CHAL_BY_ID[current], true); }
     else if (action === "run-tests") {
       var cc = CHAL_BY_ID[current], ed = root.querySelector(".sk-editor"), list = root.querySelector(".sk-tests");
       if (cc && ed && list) { session.code = ed.value; list.innerHTML = "<li>Running…</li>"; runTests(cc, ed.value).then(function(out) { list.innerHTML = testRows(cc, out); }); }
     }
+    var variantTab = e.target.closest("[data-lv]");
+    if (variantTab && session.stage === "learn") { var vi = Number(variantTab.dataset.lv); session.lv = vi; if (!has(session.seen, vi)) session.seen.push(vi); draw(); return; }
     var matchLeft = e.target.closest("[data-ml]");
     if (matchLeft && !session.result) { var li = Number(matchLeft.dataset.ml); if (session.pairs[li] !== undefined) delete session.pairs[li]; session.pending = session.pending === li ? null : li; draw(); return; }
     var matchRight = e.target.closest("[data-mr]");
