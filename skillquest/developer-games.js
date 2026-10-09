@@ -145,47 +145,6 @@ window.DEVQUEST_CONTENT = {
         { text: "Run a quick small test with each vendor to fill in the biggest gaps, then decide.", xp: { "problem-solving": 25, "decision-making": 15 }, insight: "You reduce the biggest risk first. Watch that the test doesn’t cost the discount you were trying to keep." },
         { text: "Ask a colleague who has used these vendors before and weigh their experience.", xp: { collaboration: 20, "decision-making": 10 }, insight: "You borrow experience you don’t have. Watch that the final decision is still clearly yours." }
       ]
-    },
-    /* Developer moments: the same no-wrong-answer format, set in a junior developer's week. */
-    {
-      id: "scope-before-release", skill: "time-management", title: "The Day Before Release",
-      situation: "It’s the afternoon before a release. The product manager asks you to “quickly add” an export button. Your feature is finished, but its tests aren’t written yet.",
-      question: "What do you do?",
-      options: [
-        { text: "Explain what it would cost (finishing the tests and the release date), and offer to ship the button in the next release.", xp: { "time-management": 30, communication: 15 }, insight: "You protect quality and give a clear alternative. Watch that the PM still feels heard, not blocked." },
-        { text: "Ask which matters more for this release, the button or the tested feature, and do whatever they choose.", xp: { "decision-making": 25, communication: 15 }, insight: "You make the trade-off visible and let the owner decide. Watch that you also share your own recommendation." },
-        { text: "Build a minimal version tonight behind a feature flag, so it can ship switched off if it isn’t ready.", xp: { "problem-solving": 25, "time-management": 10 }, insight: "You find a way to keep both options open. Watch your energy, and make sure the tests still get written." }
-      ]
-    },
-    {
-      id: "review-a-senior", skill: "collaboration", title: "Reviewing a Senior’s Code",
-      situation: "You’re asked to review a pull request from a senior developer. You spot a case where a missing null check could crash checkout, but you’re only three months into the job.",
-      question: "How do you raise it?",
-      options: [
-        { text: "Leave a specific comment with the input that crashes it, and phrase it as a question: “What happens when user.address is null here?”", xp: { collaboration: 25, communication: 20 }, insight: "Evidence plus curiosity makes feedback easy to accept. Watch that the question doesn’t hide how serious the bug is." },
-        { text: "Message them privately first: “I might be wrong, but I think I found a crash. Can I show you?”", xp: { collaboration: 30, leadership: 10 }, insight: "You respect the relationship and still raise the risk. Watch that the finding also ends up in the review, so it’s tracked." },
-        { text: "Write a failing test that shows the crash and attach it to your review.", xp: { "problem-solving": 30, collaboration: 10 }, insight: "A failing test is hard to argue with. Watch your tone in the comment that goes with it." }
-      ]
-    },
-    {
-      id: "incident-update", skill: "communication", title: "The Incident Update",
-      situation: "Your deploy broke login for 20 minutes. It’s fixed now. Your manager asks you to post an update in the company channel.",
-      question: "What do you write?",
-      options: [
-        { text: "What happened, how long it lasted, who was affected, that it’s fixed, and what you’ll change so it doesn’t happen again.", xp: { communication: 35, leadership: 10 }, insight: "A clear, complete update builds trust. Watch the length: lead with the impact and the fix." },
-        { text: "A short note now (“Login was down 20 minutes, it’s fixed, details to follow”), then a full write-up tomorrow.", xp: { communication: 25, "time-management": 15 }, insight: "Speed reassures people quickly. Watch that the promised follow-up really happens." },
-        { text: "Ask your manager to review your draft before you post it.", xp: { collaboration: 20, communication: 15 }, insight: "A second pair of eyes catches blame or jargon. Watch that the review doesn’t delay the update too long." }
-      ]
-    },
-    {
-      id: "merged-unread-ai-code", skill: "leadership", title: "The Code You Didn’t Read",
-      situation: "A bug reaches production. You realise it came from AI-generated code you merged last week after only skimming it.",
-      question: "What do you do first?",
-      options: [
-        { text: "Tell your lead straight away, say you merged it without reading it fully, and help fix it.", xp: { leadership: 35, communication: 10 }, insight: "Owning a mistake early builds more trust than hiding it. Watch that you also plan how to prevent the next one." },
-        { text: "Fix the bug first, then share what happened in the team retro along with a review checklist for AI code.", xp: { "problem-solving": 25, leadership: 15 }, insight: "You turn a mistake into a team improvement. Watch that people who need to know now aren’t left waiting." },
-        { text: "Pair with a teammate to fix it and to re-read the rest of that AI change together.", xp: { collaboration: 25, "problem-solving": 15 }, insight: "Two reviewers catch what one skimmed. Watch that you still tell your lead what happened." }
-      ]
     }
   ],
   /* Technical skills: game-style challenges with a correct answer. xp is the maximum a challenge can award to its skill. */
