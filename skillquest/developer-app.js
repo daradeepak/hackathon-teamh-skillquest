@@ -17,18 +17,19 @@
     { speaker: "Pip 🦊 · On call", text: "Checkout is live and one order has a negative total. What happens first?", options: ["Disable or roll back the coupon path, then verify recovery.", "Hot-edit an order in the database.", "Wait for more reports before acting."], points: [2, 0, 0], feedback: ["You reduced impact first, then checked that checkout recovered.", "Changing production data can hide the problem and create another one.", "When users are affected, stabilize the service and share only confirmed facts."] }
   ];
 
+  function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) } }; }
   function fresh() { return { choice: null, items: [], lines: [], verdicts: {}, evidence: {}, activeCriterion: null, scope: false, scopeTouched: false, reviews: {}, code: "", tests: null, result: null }; }
   function seed() {
     return { name: "Arjun", xp: 840, streak: 5, combo: 2, bestCombo: 4,
       played: ["predict-output", "explain-code", "spot-bug", "code-fix", "ai-code-audit"],
       best: { "predict-output": 100, "explain-code": 100, "spot-bug": 90, "code-fix": 100, "ai-code-audit": 80 },
       bosses: ["code-fix"], chests: ["predict-output", "explain-code", "spot-bug", "code-fix", "ai-code-audit"], rematchAt: {}, sound: false,
-      daily: { date: dayKey(), actions: [], claimed: false }, reels: [], simulator: { stage: 0, score: 0, done: false, last: "" } };
+      daily: { date: dayKey(), actions: [], claimed: false }, reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "" } };
   }
   function load() {
     try {
       var s = JSON.parse(localStorage.getItem(KEY));
-      if (s && Array.isArray(s.played)) return Object.assign(seed(), s, { best: s.best || {}, bosses: s.bosses || [], chests: s.chests || [], rematchAt: s.rematchAt || {}, reels: s.reels || [], daily: Object.assign(seed().daily, s.daily || {}), simulator: Object.assign(seed().simulator, s.simulator || {}) });
+      if (s && Array.isArray(s.played)) return Object.assign(seed(), s, { best: s.best || {}, bosses: s.bosses || [], chests: s.chests || [], rematchAt: s.rematchAt || {}, reels: s.reels || [], sortLab: sortLabOf(s.sortLab), daily: Object.assign(seed().daily, s.daily || {}), simulator: Object.assign(seed().simulator, s.simulator || {}) });
     } catch (e) {}
     return seed();
   }
@@ -37,7 +38,7 @@
     var s = seed();
     s.name = name || "Learner"; s.xp = 0; s.streak = 0; s.combo = 0; s.bestCombo = 0;
     s.played = []; s.best = {}; s.bosses = []; s.chests = []; s.rematchAt = {};
-    s.daily = { date: dayKey(), actions: [], claimed: false }; s.reels = [];
+    s.daily = { date: dayKey(), actions: [], claimed: false }; s.reels = []; s.sortLab = sortLabOf();
     s.simulator = { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 };
     return s;
   }
@@ -66,6 +67,7 @@
       chests: Array.isArray(progress.chests) ? progress.chests : [],
       rematchAt: progress.rematchAt && typeof progress.rematchAt === "object" ? progress.rematchAt : {},
       reels: Array.isArray(progress.reels) ? progress.reels : [],
+      sortLab: sortLabOf(progress.sortLab),
       daily: Object.assign(base.daily, progress.daily || {}),
       simulator: Object.assign(base.simulator, progress.simulator || {})
     });
@@ -159,14 +161,16 @@
     if (view === "home") { label.textContent = "Home"; home(); root.insertAdjacentHTML("afterbegin", dailyBanner()); }
     else if (view === "map") { label.textContent = "Game map"; track === "ai" ? aiMap() : map(); }
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
-    else if (view === "lab") { label.textContent = "Play Lab"; labHome(); root.querySelector(".lab-module-grid").insertAdjacentHTML("beforeend", moduleCard("visuals", "🎞️", "Animated Concepts", "PLAY IT · PAUSE IT", "Watch code ideas come alive. Pick a step, replay it, or tap through the whole story.", VISUALS.length + " mini explainers")); }
+    else if (view === "lab") { label.textContent = "Play Lab"; labHome(); root.querySelector(".lab-module-grid").insertAdjacentHTML("beforeend", moduleCard("visuals", "🎞️", "Animated Concepts", "PLAY IT · PAUSE IT", "Watch code ideas come alive. Pick a step, replay it, or tap through the whole story.", VISUALS.length + " mini explainers") + moduleCard("sort", "🫧", "Bubble Sort Lab", "WATCH · STEP · LEARN", "See bubble sort compare and swap, one step at a time, with the real code beside it.", state.sortLab.bubble.done ? "Completed ✓" : "Start the lab")); }
     else if (view === "visuals") { label.textContent = "Animated concepts"; visualPage(); }
+    else if (view === "sort") { label.textContent = "Bubble Sort Lab"; sortPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); if (!state.simulator.done) { var storyVisual = ["spec-check", "review-diff", "incident-steps"][Math.min(state.simulator.stage, 2)]; root.insertAdjacentHTML("beforeend", '<button class="visual-library-link sim-visual-link" data-action="visual-select" data-visual-id="' + storyVisual + '">See the skill in motion →</button>'); } }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = G[current] ? G[current].title : "Game"; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges", "visuals"].indexOf(view) >= 0)); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges", "visuals", "sort"].indexOf(view) >= 0)); });
+    if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     syncAccountUi();
     var sound = document.querySelector("[data-action='sound']");
     if (sound) { sound.textContent = state.sound ? "🔊 Sound on" : "🔈 Sound off"; sound.setAttribute("aria-pressed", String(state.sound)); }
@@ -254,6 +258,20 @@
       moduleCard("daily", "🗓️", "Daily Quest", "FRESH EACH DAY", "A small mission, a quick reel, and one story decision.", dailyCount() + "/3 complete") +
       '</div><section class="lab-footer-tip"><span>💡</span><p><b>Little and often wins.</b> These side quests are short on purpose. Come back tomorrow for a fresh daily checklist.</p></section>';
   }
+  function sortPage() {
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ALGORITHM LAB · +40 XP</span><h1>Bubble Sort Lab 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section><div id="bubble-sort-host"></div>';
+  }
+  function mountSortLab() {
+    var host = document.getElementById("bubble-sort-host");
+    if (!host || !window.SkillQuestBubbleSort) { if (host) host.textContent = "The visualizer could not load. Refresh the page to try again."; return; }
+    window.SkillQuestBubbleSort.mount(host, { alreadyDone: state.sortLab.bubble.done, onComplete: completeBubbleSort });
+  }
+  function completeBubbleSort(result) {
+    if (state.sortLab.bubble.done) return { message: "✓ Sort Sprinter badge earned — replay any time for practice." };
+    state.sortLab.bubble.done = true; state.xp += 40; save();
+    say("Bubble Sort complete! +40 XP");
+    return { message: "🎉 You watched all " + result.comparisons + " comparisons and " + result.swaps + " swaps. +40 XP and the Sort Sprinter badge!" };
+  }
   function dailyPage() {
     var n = dailyCount(), done = n === DAILY_TASKS.length;
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">FRESH CHECKLIST · ' + esc(state.daily.date) + '</span><h1>Today’s tiny quest 🗓️</h1><p>Three small actions. Your streak grows one good day at a time.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section>' +
@@ -293,6 +311,7 @@
       { icon: '🧾', title: 'Spec Sleuth', desc: 'Score 80% or better in Spec Check.', unlocked: (state.best['spec-check'] || 0) >= 80 },
       { icon: '📼', title: 'Pocket Professor', desc: 'Collect all three Knowledge Reels.', unlocked: state.reels.length >= REELS.length },
       { icon: '🎭', title: 'Calm in the Chaos', desc: 'Finish the workplace simulator.', unlocked: state.simulator.done },
+      { icon: '🫧', title: 'Sort Sprinter', desc: 'Watch the whole Bubble Sort Lab.', unlocked: state.sortLab.bubble.done },
       { icon: '🔥', title: 'Combo Spark', desc: 'Build a combo of three.', unlocked: (state.bestCombo || 0) >= 3 },
       { icon: '🎁', title: 'Daily Dynamo', desc: 'Claim the daily quest reward.', unlocked: state.daily.claimed },
       { icon: '🏕️', title: 'Streak Camper', desc: 'Reach a five-day learning streak.', unlocked: state.streak >= 5 }

@@ -19,6 +19,7 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 - The Code Fix boss runs user-edited JavaScript in a time-limited Web Worker.
 - An AI Engineer teaser track includes Hallucination Hunter and Prompt Fix.
 - Pip’s Animated Concepts adds 14 step-by-step explainers with play, pause, tap-to-step, and replay controls; each game opens its matching animation, and Knowledge Reels link to theirs.
+- Bubble Sort Lab (Play Lab → Bubble Sort Lab): a 3D step-by-step visualizer with play, pause, step, scrub, speed control and custom arrays. Watching every step earns +40 XP and the Sort Sprinter badge once.
 - XP, combos, rematches, the scoreboard, sound toggle, and a mystery-chest reward.
 - Local account registration, sign-in, sign-out, password hashing, and server-backed progress saving.
 - Play Lab adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
@@ -33,5 +34,6 @@ Everything is fictional demo content. Accounts are stored in a local JSON file, 
 - `developer-games.js` — mission data and levels
 - `developer-visuals.js` — 14 interactive animation storyboards for the learning concepts
 - `developer-app.js` — navigation, game rules, feedback, and local progress
+- `bubble-sort.js` and `bubble-sort.css` — the Bubble Sort Lab (styles are scoped under `.bs`)
 - `server.js` and `start-localhost.bat` — local web server and account API
 - `data/accounts.json` — local dummy account database (created or updated when accounts are used)
