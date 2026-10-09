@@ -7,9 +7,12 @@ const root = path.resolve(__dirname);
 const dataDir = path.join(root, "data");
 const databaseFile = process.env.SKILLQUEST_DB_PATH || path.join(dataDir, "accounts.json");
 const port = Number(process.env.PORT) || 8000;
+const host = process.env.HOST || "127.0.0.1"; /* set HOST=0.0.0.0 to share on your local network */
 const sessions = new Map();
 const SESSION_TTL = 12 * 60 * 60 * 1000;
 const MAX_BODY = 300 * 1024;
+const MAX_AVATAR = 60 * 1024; /* characters of a small data URL; the browser shrinks photos before sending */
+const AVATAR_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
 const contentTypes = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -74,7 +77,7 @@ function cookieValue(request, name) {
 }
 
 function sessionFor(request) {
-  const token = cookieValue(request, "skillquest_session");
+  const token = cookieValue(request, "xpaddition_session");
   const session = token && sessions.get(token);
   if (!session) return null;
   if (session.expiresAt < Date.now()) { sessions.delete(token); return null; }
@@ -82,11 +85,11 @@ function sessionFor(request) {
 }
 
 function sessionCookie(token) {
-  return "skillquest_session=" + encodeURIComponent(token) + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + (SESSION_TTL / 1000);
+  return "xpaddition_session=" + encodeURIComponent(token) + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + (SESSION_TTL / 1000);
 }
 
 function clearSessionCookie() {
-  return "skillquest_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0";
+  return "xpaddition_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0";
 }
 
 function issueSession(response, userId) {
@@ -96,7 +99,7 @@ function issueSession(response, userId) {
 }
 
 function publicUser(user) {
-  return { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt, progress: user.progress || null };
+  return { id: user.id, name: user.name, email: user.email, avatar: user.avatar || "", createdAt: user.createdAt, progress: user.progress || null };
 }
 
 function passwordKey(password, salt) {
@@ -153,21 +156,6 @@ async function handleApi(request, response, route) {
     return sendJson(response, 200, { user: publicUser(user) });
   }
 
-  if (route === "/api/leaderboard" && request.method === "GET") {
-    const current = sessionFor(request);
-    if (!current) return sendJson(response, 401, { error: "Sign in to see the leaderboard." });
-    const players = readDatabase().users.map(user => {
-      const progress = user.progress && typeof user.progress === "object" ? user.progress : {};
-      const xpValue = Number(progress.xp);
-      return {
-        name: user.name,
-        xp: Number.isFinite(xpValue) && xpValue > 0 ? xpValue : 0,
-        isCurrent: user.id === current.session.userId
-      };
-    }).sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name));
-    return sendJson(response, 200, { players });
-  }
-
   if (route === "/api/progress" && request.method === "POST") {
     const current = sessionFor(request);
     if (!current) return sendJson(response, 401, { error: "Sign in again to save account progress." });
@@ -179,6 +167,38 @@ async function handleApi(request, response, route) {
     user.progress = body.progress;
     writeDatabase(db);
     return sendJson(response, 200, { ok: true });
+  }
+
+  if (route === "/api/profile" && request.method === "POST") {
+    const current = sessionFor(request);
+    if (!current) return sendJson(response, 401, { error: "Sign in to edit your profile." });
+    const body = await readJson(request);
+    const db = readDatabase();
+    const user = db.users.find(entry => entry.id === current.session.userId);
+    if (!user) return sendJson(response, 401, { error: "This account is no longer available." });
+    if (body.name !== undefined) {
+      const name = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 40);
+      if (name.length < 2) return sendJson(response, 400, { error: "Use a name with at least 2 characters." });
+      user.name = name;
+    }
+    if (body.avatar !== undefined) {
+      const avatar = String(body.avatar || "");
+      if (avatar && (avatar.length > MAX_AVATAR || !AVATAR_PATTERN.test(avatar))) return sendJson(response, 400, { error: "Use a PNG, JPEG or WebP photo." });
+      user.avatar = avatar;
+    }
+    writeDatabase(db);
+    return sendJson(response, 200, { user: publicUser(user) });
+  }
+
+  if (route === "/api/leaderboard" && request.method === "GET") {
+    const current = sessionFor(request);
+    const db = readDatabase();
+    const players = db.users.map(user => ({ id: user.id, name: user.name, avatar: user.avatar || "", xp: Math.max(0, Math.floor(Number(user.progress && user.progress.xp)) || 0), createdAt: user.createdAt || "" }))
+      .sort((a, b) => b.xp - a.xp || String(a.createdAt).localeCompare(String(b.createdAt)))
+      .map((player, index) => ({ rank: index + 1, name: player.name, avatar: player.avatar, xp: player.xp, me: !!current && player.id === current.session.userId }));
+    const top = players.slice(0, 50), me = players.find(player => player.me);
+    if (me && !top.includes(me)) top.push(me);
+    return sendJson(response, 200, { players: top, total: players.length });
   }
 
   if (route.startsWith("/api/")) return sendJson(response, 404, { error: "API route not found." });
@@ -228,8 +248,8 @@ const server = http.createServer((request, response) => {
   serveFile(request, response, requestedPath);
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log("XPaddition is running at http://localhost:" + port);
+server.listen(port, host, () => {
+  console.log("XPaddition is running at http://localhost:" + port + (host === "0.0.0.0" ? " (shared on your network)" : ""));
   console.log("Account database: " + databaseFile);
   console.log("Press Ctrl+C to stop.");
 });

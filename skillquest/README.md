@@ -1,6 +1,6 @@
-# XPaddition — developer learning game
+# XPaddition — soft skills and technical skills game
 
-A playful, dependency-free prototype. Developers learn to inspect AI-written code by playing short missions, collecting XP, and unlocking boss challenges.
+A playful, dependency-free prototype. Players practise short workplace scenarios, collect XP, and unlock a challenge at the end of each level.
 
 ## Run locally on Windows
 
@@ -13,16 +13,14 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 
 ## What is playable
 
-- Developer Core: Read It, Check It, and Direct It & Own It.
-- A boss challenge unlocks after three games in a level reach an Okay score; clearing a boss opens the next level.
-- Mini-games include code comprehension, tap-the-bug, acceptance-criteria checks, test review, security review, and a scripted pull-request review.
-- The Code Fix boss runs user-edited JavaScript in a time-limited Web Worker.
-- An AI Engineer teaser track includes Hallucination Hunter and Prompt Fix.
-- Pip’s Animated Concepts adds 14 step-by-step explainers with play, pause, tap-to-step, and replay controls; each game opens its matching animation, and Knowledge Reels link to theirs.
-- The Game Map includes a JavaScript Trail with 12 sequential animated lessons: first steps, logic, and web basics. Complete each short animation to earn 20 XP and unlock the next stop. Play Lab’s JavaScript Code Cinema opens the lesson library.
-- XP, combos, rematches, the scoreboard, sound toggle, and a mystery-chest reward.
+- Game Map (sidebar) has two tabs. **Soft Skills** is a capability map with a player level and six individual skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). Its scenarios have no right or wrong answers: the approach a player chooses awards XP to the skills it shows, and the first choice per scenario counts. **Technical Skills** covers HTML, CSS and JavaScript. Each skill has its own learn-then-play path: a short interactive visual lesson (compare versions side by side, or step through code with its state) comes first, worth +10 XP once, followed by the challenge. There are 12 lessons and 12 interactive challenges: a live CSS editor with a preview and goal checklist, a JavaScript editor that runs tests in a time-limited Web Worker, type-in blanks, matching pairs, putting pieces in order, and tapping buggy lines. Score 60% or more to clear a challenge; improving your best score earns the rest of its XP.
+- Leaderboard (sidebar) ranks registered players by XP and highlights you. Scoreboard keeps your personal stats.
+- Profile: click your avatar to edit your display name and upload a photo (resized in the browser, saved to your account, or kept on this device as a guest).
+- Light/Dark theme switch in the top bar; the choice is remembered.
+- Animated (sidebar) holds animated walkthroughs. DSA lists two algorithms. **Bubble Sort** is a 3D step-by-step visualizer with play, pause, step, scrub, speed control and custom arrays (Sort Sprinter badge). **Binary Search** halves a sorted list with lo/mid/hi markers, a target you choose and the code highlighted (Search Savant badge). Each earns +40 XP once.
+- XP, player levels, a scoreboard, and a sound toggle.
 - Local account registration, sign-in, sign-out, password hashing, and server-backed progress saving.
-- Play Lab adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
+- The older lab (daily quest, reels, story and badges; temporarily hidden; set `LAB_ENABLED = true` in `developer-app.js` and restore its sidebar button and home banner to bring it back) adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
 - Complete a mission, collect a reel, and finish the story to unlock the daily +80 XP reward. Reel, story, quest, and badge progress saves in this browser.
 
 Everything is fictional demo content. Accounts are stored in a local JSON file, not a hosted service. This is a localhost prototype and is not intended for production or real passwords.
@@ -31,9 +29,11 @@ Everything is fictional demo content. Accounts are stored in a local JSON file, 
 
 - `index.html` — page shell and navigation
 - `style.css` — responsive styling
-- `developer-games.js` — mission data and levels
-- `developer-visuals.js` — 14 interactive animation storyboards for the learning concepts
-- `developer-js-lessons.js` — beginner JavaScript mini-movie storyboards
+- `developer-games.js` — the soft skills and scenarios (options and the XP each awards), plus the technical skills and challenges
+- `binary-search.js` and `binary-search.css` — the Binary Search lab (styles scoped under `.bsr`)
+- `skills.css` — styles for the Game Map and scenarios
+- `theme.css` — logo animation, dark mode, avatars, leaderboard and profile styles
 - `developer-app.js` — navigation, game rules, feedback, and local progress
+- `bubble-sort.js` and `bubble-sort.css` — the Bubble Sort Lab (styles are scoped under `.bs`)
 - `server.js` and `start-localhost.bat` — local web server and account API
 - `data/accounts.json` — local dummy account database (created or updated when accounts are used)
