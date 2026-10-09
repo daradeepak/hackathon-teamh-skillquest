@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Binary Search Visualizer</title>
+<style>
+:root{--bg:#0b0d12;--panel:#12151c;--text:#e6e9ef;--muted:#7b8394;--cell:#1d2330;--lo:#4aa3ff;--hi:#b78cff;--mid:#ffb84a;--ok:#3ddc97;--dim:#2a2f3c}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 50% 30%,#141824,var(--bg));color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;min-height:100vh;display:flex;justify-content:center;padding:24px 16px}
+main{width:100%;max-width:720px}
+h1{text-align:center;letter-spacing:.25em;margin:8px 0 4px;font-size:22px}
+.sub{text-align:center;color:var(--muted);font-size:12px}
+.badges{display:flex;gap:8px;justify-content:center;margin:10px 0 18px}
+.badge{border:1px solid #2f6f8f;color:#8fd3f0;border-radius:999px;padding:3px 10px;font-size:11px}
+.target{text-align:center;color:var(--mid);font-size:18px;margin:8px 0}
+.row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:34px}
+.cell{width:38px;text-align:center;position:relative}
+.box{height:38px;line-height:38px;border-radius:6px;background:var(--cell);border:1px solid #2b3345;transition:all .25s}
+.idx{font-size:10px;color:var(--muted);margin-top:4px}
+.cell.out .box{opacity:.25;background:var(--dim)}
+.cell.mid .box{background:var(--mid);color:#111;transform:translateY(-4px)}
+.cell.found .box{background:var(--ok);color:#111}
+.tags{position:absolute;top:-22px;left:0;right:0;font-size:10px;display:flex;justify-content:center;gap:2px}
+.tag{padding:1px 4px;border-radius:4px;color:#0b0d12}
+.tag.lo{background:var(--lo)}.tag.hi{background:var(--hi)}
+.msg{margin:26px auto 14px;text-align:center;min-height:34px}
+.msg span{display:inline-block;padding:6px 14px;border:1px solid var(--ok);color:var(--ok);border-radius:999px;font-size:13px}
+.controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px}
+button,input,select{background:var(--panel);color:var(--text);border:1px solid #2b3345;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--lo)}
+input{width:80px;cursor:text}
+pre{background:var(--panel);border:1px solid #232938;border-radius:10px;padding:12px 0;margin:0;overflow:auto;font-size:14px}
+.ln{display:block;padding:1px 14px;white-space:pre}
+.ln b{color:var(--muted);font-weight:normal;display:inline-block;width:28px}
+.ln.on{background:rgba(61,220,151,.18)}
+</style>
+</head>
+<body>
+<main>
+  <h1>BINARY SEARCH</h1>
+  <div class="sub">find the index where the target value lives</div>
+  <div class="badges"><span class="badge">TIME O(log n)</span><span class="badge">SPACE O(1)</span></div>
+  <div class="target" id="target"></div>
+  <div class="row" id="row"></div>
+  <div class="msg"><span id="msg" hidden></span></div>
+  <div class="controls">
+    <label>Target <input id="tin" type="number" value="10"></label>
+    <button id="reset">Reset</button>
+    <button id="step">Step</button>
+    <button id="play">Play</button>
+    <select id="speed"><option value="1200">Slow</option><option value="700" selected>Normal</option><option value="300">Fast</option></select>
+  </div>
+  <pre id="code"></pre>
+</main>
+<script>
+const A=[2,4,5,7,8,9,11,12,14,15,17,18,20,21,23];
+const CODE=[
+"def binary_search(a, target):",
+"    lo, hi = 0, len(a) - 1",
+"    while lo <= hi:",
+"        mid = (lo + hi) // 2",
+"        if a[mid] == target:",
+"            return mid",
+"        if a[mid] < target:",
+"            lo = mid + 1",
+"        else:",
+"            hi = mid - 1",
+"    return -1"];
+let s,timer=null;
+const $=id=>document.getElementById(id);
+function init(){
+  stop();
+  s={lo:0,hi:A.length-1,mid:null,phase:"start",t:+$("tin").value,step:0,done:false,found:-1,line:0};
+  render("Press Step or Play");
+}
+function render(m,lines){
+  $("target").textContent=`Target: ${s.t} · ${s.step}/${Math.ceil(Math.log2(A.length+1))}`;
+  $("row").innerHTML=A.map((v,i)=>{
+    const out=s.done?s.found!==i:(i<s.lo||i>s.hi);
+    const cls=["cell",out&&"out",i===s.mid&&"mid",s.done&&s.found===i&&"found"].filter(Boolean).join(" ");
+    const tags=(!s.done&&i===s.lo?'<span class="tag lo">lo</span>':'')+(!s.done&&i===s.hi?'<span class="tag hi">hi</span>':'');
+    return `<div class="${cls}"><div class="tags">${tags}</div><div class="box">${v}</div><div class="idx">${i}</div></div>`}).join("");
+  const el=$("msg");el.hidden=!m;el.textContent=m||"";
+  $("code").innerHTML=CODE.map((l,i)=>`<span class="ln${(lines||[]).includes(i)?" on":""}"><b>${i+1}</b>${l.replace(/</g,"&lt;")}</span>`).join("");
+}
+function step(){
+  if(s.done)return;
+  if(s.phase==="start"){s.phase="check";}
+  if(s.phase==="check"){
+    if(s.lo>s.hi){s.done=true;render(`Not found → return -1`,[10]);stop();return}
+    s.mid=Math.floor((s.lo+s.hi)/2);s.step++;s.phase="compare";
+    render(`mid = (${s.lo}+${s.hi})//2 = ${s.mid}`,[2,3]);return;
+  }
+  if(s.phase==="compare"){
+    const v=A[s.mid];
+    if(v===s.t){s.done=true;s.found=s.mid;render(`a[${s.mid}] = ${v} == target → return ${s.mid}`,[4,5]);stop();return}
+    if(v<s.t){s.lo=s.mid+1;s.phase="check";render(`a[mid] = ${v} < ${s.t} → go right`,[6,7]);}
+    else{s.hi=s.mid-1;s.phase="check";render(`a[mid] = ${v} > ${s.t} → go left`,[8,9]);}
+  }
+}
+function stop(){if(timer){clearInterval(timer);timer=null}$("play").textContent="Play"}
+$("play").onclick=()=>{if(timer){stop();return}if(s.done)init();$("play").textContent="Pause";step();timer=setInterval(step,+$("speed").value)};
+$("speed").onchange=()=>{if(timer){clearInterval(timer);timer=setInterval(step,+$("speed").value)}};
+$("step").onclick=()=>{stop();step()};
+$("reset").onclick=init;
+$("tin").onchange=init;
+init();
+</script>
+</body>
+</html>
