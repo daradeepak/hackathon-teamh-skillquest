@@ -5,7 +5,6 @@
   var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "core", hint = false;
   var account = null, accountMode = "login";
   var timer = null, session = fresh(), reelIndex = 0, reelRevealed = false, reelAnswer = null, reelFeedback = "";
-  var VISUALS = window.DEVQUEST_VISUALS.items, visualId = VISUALS[0].id, visualStep = 0, visualPlaying = false, visualTimer = null;
   var REELS = [
     { id: "trace", title: "Trace before you trust", tag: "CODE READING", icon: "🔎", hook: "AI says this returns 12. Can you spot the tiny twist?", lesson: "Follow the values line by line. Here, the loop adds each price multiplied by its quantity. A test can pass while your mental model is still off.", question: "For items [{price: 2, qty: 3}, {price: 4, qty: 1}], what is the total?", options: ["9", "10", "14"], answer: 1 },
     { id: "spec", title: "The ticket is the map", tag: "SPEC CHECK", icon: "🧾", hook: "The demo passed. The ticket still says one coupon per customer.", lesson: "Turn each sentence in a ticket into a check. Then point to the code or test that proves it. If you cannot point to evidence, mark it unknown instead of assuming.", question: "Which review comment is most useful?", options: ["Looks good to me!", "Where do we reject a second use by the same customer?", "The code could be cleaner."], answer: 1 },
@@ -150,26 +149,24 @@
   }
   function open(id) {
     if (!canOpen(id)) { say(isBoss(id) ? "Win 3 games at Okay or better to unlock this boss." : "Beat the earlier boss to open this level."); return; }
-    stopVisualPlayback();
-    var lessonVisual = visualForGame(id); if (lessonVisual) { visualId = lessonVisual.id; visualStep = 0; }
     current = id; view = "game"; hint = false; session = fresh();
     if (G[id].kind === "codeFix") session.code = G[id].starterCode;
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  function go(where) { stopVisualPlayback(); view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function go(where) { view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function draw() {
     if (view === "home") { label.textContent = "Home"; home(); root.insertAdjacentHTML("afterbegin", dailyBanner()); }
     else if (view === "map") { label.textContent = "Game map"; track === "ai" ? aiMap() : map(); }
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
-    else if (view === "lab") { label.textContent = "Play Lab"; labHome(); root.querySelector(".lab-module-grid").insertAdjacentHTML("beforeend", moduleCard("visuals", "🎞️", "Animated Concepts", "PLAY IT · PAUSE IT", "Watch code ideas come alive. Pick a step, replay it, or tap through the whole story.", VISUALS.length + " mini explainers") + moduleCard("sort", "🫧", "Bubble Sort Lab", "WATCH · STEP · LEARN", "See bubble sort compare and swap, one step at a time, with the real code beside it.", state.sortLab.bubble.done ? "Completed ✓" : "Start the lab")); }
-    else if (view === "visuals") { label.textContent = "Animated concepts"; visualPage(); }
-    else if (view === "sort") { label.textContent = "Bubble Sort Lab"; sortPage(); }
+    else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
+    else if (view === "anim") { label.textContent = "Animated"; animatedPage(); }
+    else if (view === "sort") { label.textContent = "Animated · Bubble Sort"; sortPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
-    else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); if (!state.simulator.done) { var storyVisual = ["spec-check", "review-diff", "incident-steps"][Math.min(state.simulator.stage, 2)]; root.insertAdjacentHTML("beforeend", '<button class="visual-library-link sim-visual-link" data-action="visual-select" data-visual-id="' + storyVisual + '">See the skill in motion →</button>'); } }
+    else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = G[current] ? G[current].title : "Game"; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges", "visuals", "sort"].indexOf(view) >= 0)); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && view === "sort")); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     syncAccountUi();
     var sound = document.querySelector("[data-action='sound']");
@@ -235,18 +232,6 @@
   function moduleCard(id, icon, title, tag, desc, status) {
     return '<button class="lab-module-card ' + id + '-module" data-module="' + id + '"><span class="lab-module-icon">' + icon + '</span><span class="lab-module-tag">' + tag + '</span><strong>' + title + '</strong><small>' + desc + '</small><span class="lab-module-go">' + status + ' →</span></button>';
   }
-  function getVisual(id) { return VISUALS.find(function(item) { return item.id === id; }) || VISUALS[0]; }
-  function visualForGame(gameId) { return VISUALS.find(function(item) { return item.game === gameId; }); }
-  function renderVisualPlayer(id, inline) {
-    var visual = getVisual(id), step = visual.steps[Math.min(visualStep, visual.steps.length - 1)];
-    var codeRows = visual.code.map(function(line, i) { var focused = step.focus.indexOf(i) >= 0; return '<div class="visual-code-row ' + (focused ? "focused" : "") + '"><span>' + (i + 1) + '</span><code>' + esc(line) + '</code>' + (focused ? '<b>← Pip is here</b>' : '') + '</div>'; }).join("");
-    var nodes = step.nodes.map(function(node, i) { return (i ? '<span class="visual-arrow" aria-hidden="true">➜</span>' : '') + '<article class="visual-node" style="--node-delay:' + (i * 100) + 'ms"><span>' + node.icon + '</span><strong>' + esc(node.title) + '</strong><small>' + esc(node.value) + '</small></article>'; }).join("");
-    return '<section id="visual-player" class="visual-player ' + (inline ? 'visual-player-inline' : '') + '" aria-labelledby="visual-player-title"><header class="visual-player-header"><div><span class="visual-kicker">' + (inline ? 'PIP’S ANIMATED EXPLAINER' : esc(visual.category.toUpperCase()) + ' · PIP’S PLAYBACK') + '</span><h2 id="visual-player-title">' + esc(visual.title) + '</h2><p>' + esc(visual.intro) + '</p></div>' + (inline ? '<button class="visual-library-link" data-module="visuals">Open all animated concepts →</button>' : '<a class="visual-reference-link" href="https://www.instagram.com/reel/Dc0uPlaTDsT/?cplk=dnk1ZTF3NGFsMmxu" target="_blank" rel="noopener noreferrer">See your reference reel ↗</a>') + '</header><div class="visual-workbench"><div class="visual-code-window"><div class="visual-window-top"><span></span><span></span><span></span><b>Watch the code</b></div><div class="visual-code-list">' + codeRows + '</div></div><div class="visual-stage" data-visual-scene="' + esc(visual.id) + '"><div class="visual-stage-title"><span class="visual-stage-icon">' + visual.icon + '</span><div><small>SCENE ' + (visualStep + 1) + ' / ' + visual.steps.length + '</small><strong>' + esc(step.label) + '</strong></div><span class="visual-spark">✦</span></div><div class="visual-flow" aria-live="polite">' + nodes + '</div><div class="visual-takeaway"><span>WHAT JUST HAPPENED</span><strong>' + esc(step.takeaway) + '</strong></div><p class="visual-caption">' + esc(step.caption) + '</p></div></div><div class="visual-scrubber" aria-label="Explanation steps">' + visual.steps.map(function(x, i) { return '<button data-action="visual-step" data-step="' + i + '" class="' + (i === visualStep ? 'active ' : '') + (i < visualStep ? 'done' : '') + '" aria-label="Step ' + (i + 1) + ': ' + esc(x.label) + '" aria-current="' + (i === visualStep ? 'step' : 'false') + '"><span>' + (i < visualStep ? '✓' : i + 1) + '</span>' + esc(x.label) + '</button>'; }).join('') + '</div><div class="visual-controls"><button class="visual-control-secondary" data-action="visual-reset">↺ Start over</button><div><button class="visual-control-primary" data-action="visual-toggle">' + (visualPlaying ? 'Ⅱ Pause' : '▶ Play animation') + '</button><button class="visual-control-next" data-action="visual-next">Next beat →</button></div><span class="visual-step-count">' + (visualStep + 1) + ' of ' + visual.steps.length + '</span></div></section>';
-  }
-  function visualPage() {
-    var currentVisual = getVisual(visualId);
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">LITTLE STORIES FOR BIG IDEAS</span><h1>Pip’s Animated Concepts 🎞️</h1><p>Press play, pause, or tap any beat. Watch the code change the picture.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section><div class="visual-library">' + VISUALS.map(function(item) { return '<button class="visual-concept-card ' + (item.id === currentVisual.id ? 'selected' : '') + '" data-action="visual-select" data-visual-id="' + item.id + '"><span>' + item.icon + '</span><div><small>' + esc(item.category) + '</small><strong>' + esc(item.title) + '</strong></div><b>↗</b></button>'; }).join('') + '</div>' + renderVisualPlayer(currentVisual.id, false);
-  }
   function labHome() {
     var unlocked = badgeList().filter(function(b) { return b.unlocked; }).length;
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SIDE QUESTS & QUICK WINS</span><h1>Welcome to the Play Lab ✨</h1><p>Take a breather from the map. Learn a tiny thing, make a call, grab a badge.</p></div><span class="lab-level-pill">🦊 Pip’s lab</span></section>' +
@@ -258,8 +243,21 @@
       moduleCard("daily", "🗓️", "Daily Quest", "FRESH EACH DAY", "A small mission, a quick reel, and one story decision.", dailyCount() + "/3 complete") +
       '</div><section class="lab-footer-tip"><span>💡</span><p><b>Little and often wins.</b> These side quests are short on purpose. Come back tomorrow for a fresh daily checklist.</p></section>';
   }
+  var ANIMATED = [
+    { id: "dsa", name: "DSA", icon: "🧮", blurb: "Data structures and algorithms, one step at a time.", items: [
+      { view: "sort", icon: "🫧", title: "Bubble Sort", tag: "SORTING · O(n²)", desc: "Watch neighbours compare and swap while the real code lights up beside them.", status: function() { return state.sortLab.bubble.done ? "Completed ✓" : "Start · +40 XP"; } }
+    ] }
+  ];
+  function animatedPage() {
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Animated 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
+      ANIMATED.map(function(cat) {
+        return '<section class="anim-category" aria-labelledby="anim-' + cat.id + '"><div class="dev-section-head"><div><span class="dev-eyebrow">' + cat.icon + ' ' + esc(cat.blurb) + '</span><h2 id="anim-' + cat.id + '">' + esc(cat.name) + '</h2></div></div><div class="lab-module-grid">' +
+          cat.items.map(function(item) { return moduleCard(item.view, item.icon, item.title, item.tag, item.desc, item.status()); }).join("") + '</div></section>';
+      }).join("") +
+      '<section class="lab-footer-tip"><span>💡</span><p><b>More algorithms are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
+  }
   function sortPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ALGORITHM LAB · +40 XP</span><h1>Bubble Sort Lab 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section><div id="bubble-sort-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Bubble Sort Lab 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section><div id="bubble-sort-host"></div>';
   }
   function mountSortLab() {
     var host = document.getElementById("bubble-sort-host");
@@ -286,11 +284,6 @@
       '<button class="reel-card ' + (reelRevealed ? 'flipped' : '') + '" data-action="reel-flip"><span class="reel-card-tag">' + r.tag + '</span><span class="reel-card-icon">' + r.icon + '</span><strong>' + (reelRevealed ? r.title : r.hook) + '</strong><small>' + (reelRevealed ? 'TAP TO FLIP BACK' : 'TAP TO REVEAL THE 20-SECOND TIP') + '</small></button>' +
       (reelRevealed ? '<section class="reel-lesson"><span>💡 PIP’S POCKET TIP</span><p>' + r.lesson + '</p><h3>' + r.question + '</h3><div class="reel-answer-list">' + r.options.map(function(x, i) { return '<button class="reel-answer ' + (reelAnswer === i ? 'picked' : '') + '" data-reel-answer="' + i + '">' + x + '</button>'; }).join('') + '</div>' + (reelFeedback ? '<p class="reel-feedback ' + (completed ? 'correct' : '') + '">' + reelFeedback + '</p>' : '') + '<button class="primary-button" data-action="reel-check"' + (!answered || completed ? ' disabled' : '') + '>' + (completed ? 'Reel collected ✓' : 'Check it · +35 XP') + '</button></section>' : '<p class="reel-swipe-hint">Tiny lesson. No long scroll. Pinky promise. 🤙</p>') +
       '<div class="reel-nav"><button class="secondary-button" data-action="reel-prev">← Previous</button><span>' + state.reels.length + ' / ' + REELS.length + ' collected</span><button class="secondary-button" data-action="reel-next">Next →</button></div></div>';
-    if (reelRevealed) {
-      var reelVisual = r.id === "trace" ? "trace-values" : (r.id === "spec" ? "spec-check" : "review-diff");
-      var lessonCopy = root.querySelector(".reel-lesson > p");
-      if (lessonCopy) lessonCopy.insertAdjacentHTML("afterend", '<button class="visual-library-link reel-visual-link" data-action="visual-select" data-visual-id="' + reelVisual + '">Watch this idea come alive →</button>');
-    }
   }
   function simulatorPage() {
     var s = state.simulator;
@@ -356,7 +349,7 @@
     root.innerHTML = '<div class="dev-game-page">' + gameTop(g) + '<section class="dev-game-card"><div class="dev-game-heading"><span class="dev-eyebrow">' + esc(g.skill) + '</span><h1>' + esc(g.title) + '</h1><p>' + esc(g.intro) + '</p></div>' +
       (session.result ? resultCard(g) : body(g)) +
       (!session.result ? '<div class="dev-game-footer"><button class="dev-hint-button" data-action="hint">' + (hint ? "🙈 Hide hint" : "💡 Need a nudge?") + '</button><button class="primary-button" data-action="submit">' + (g.kind === "codeFix" ? "Run the tests" : (g.kind === "specCheck" ? "Check this diff" : (g.kind === "prReview" ? "Send review to DevBot" : "Lock in my answer"))) + ' →</button></div>' + (hint ? '<div class="dev-hint"><b>Pip’s tiny hint:</b> ' + esc(g.concept) + '</div>' : "") : "") +
-      '</section>' + renderVisualPlayer((visualForGame(g.id) || VISUALS[0]).id, true) + '</div>';
+      '</section>' + '</div>';
     var submit = root.querySelector("[data-action='submit']");
     if (submit && !session.result && !canSubmit(g)) submit.disabled = true;
   }
@@ -479,33 +472,6 @@
     if (!state.sound) return;
     try { var C = window.AudioContext || window.webkitAudioContext; if (!C) return; var c = new C(), o = c.createOscillator(), v = c.createGain(); o.frequency.value = 740; v.gain.value = .04; o.connect(v); v.connect(c.destination); o.start(); o.stop(c.currentTime + .12); setTimeout(function() { c.close(); }, 250); } catch (e) {}
   }
-  function stopVisualPlayback() {
-    if (visualTimer) clearInterval(visualTimer);
-    visualTimer = null; visualPlaying = false;
-  }
-  function setVisualStep(nextStep) {
-    var visual = getVisual(visualId);
-    visualStep = Math.max(0, Math.min(visual.steps.length - 1, nextStep));
-    if (visualStep >= visual.steps.length - 1) stopVisualPlayback();
-    draw();
-  }
-  function toggleVisualPlayback() {
-    if (visualPlaying) { stopVisualPlayback(); draw(); return; }
-    var visual = getVisual(visualId);
-    if (visualStep >= visual.steps.length - 1) visualStep = 0;
-    visualPlaying = true;
-    visualTimer = setInterval(function() {
-      if (visualStep >= visual.steps.length - 1) { stopVisualPlayback(); draw(); return; }
-      visualStep += 1;
-      if (visualStep >= visual.steps.length - 1) stopVisualPlayback();
-      draw();
-    }, 1900);
-    draw();
-  }
-  function selectVisual(id) {
-    stopVisualPlayback(); visualId = getVisual(id).id; visualStep = 0; view = "visuals"; current = null; draw();
-    var player = document.getElementById("visual-player"); if (player) player.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
   function reset() {
     state = account ? freshAccount(account.name) : seed(); save(); go("home"); say("Fresh start! Pip is cheering you on.");
   }
@@ -528,11 +494,6 @@
     if (action === "account") renderAccountModal(account ? "account" : "login");
     else if (action === "close-account") closeAccountModal();
     else if (action === "account-logout") signOut();
-    else if (action === "visual-select") { selectVisual(actionButton.dataset.visualId); return; }
-    else if (action === "visual-step") { stopVisualPlayback(); setVisualStep(Number(actionButton.dataset.step)); return; }
-    else if (action === "visual-next") { stopVisualPlayback(); setVisualStep(visualStep + 1); return; }
-    else if (action === "visual-reset") { stopVisualPlayback(); setVisualStep(0); return; }
-    else if (action === "visual-toggle") { toggleVisualPlayback(); return; }
     else if (action === "continue") open(nextGame());
     else if (action === "hint") { hint = !hint; draw(); }
     else if (action === "submit") submit();
