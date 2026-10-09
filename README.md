@@ -6,10 +6,11 @@
 
 **The problem.** Most upskilling is passive: slide decks, long videos, quizzes that reward memorising. Soft skills are even harder, because there is rarely one right answer, so they are skipped or taught as lectures. New hires end up with technical know-how but little practice at the moments that decide how they work with people.
 
-**The solution.** XPedition teaches by doing, in two tracks that share one XP system:
+**The solution.** XPedition teaches by doing, in three tracks that share one XP system:
 
 - **Soft Skills** — 12 short workplace scenarios across six skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). There are no right or wrong answers. The approach you choose awards XP to the skills it shows, and a short note explains what that approach is good at and what to watch for.
 - **Technical Skills** — HTML, CSS and JavaScript. Each skill has a *learn, then play* path: a short interactive visual lesson (compare versions side by side, or step through code and watch its state), then a challenge. JavaScript also has a 12-lesson learn trail from your first line to async code.
+- **AI Code Check** — AI now writes much of the code, so the real job is to read code you didn't write and check it does what was asked. Three levels (Read It, Check It, Direct It & Own It) with 9 games and 3 boss rounds: predict the output, spot the bug, check a change against a ticket (Spec Check), audit for security problems, fix code until tests pass, review an AI's pull request, and handle a 2 AM incident. Combos, mystery chests and 48-hour rematches keep it fresh. ([Stack Overflow Developer Survey 2025](https://survey.stackoverflow.co/2025/ai): 66% of developers say AI code is "almost right, but not quite".)
 
 **What was built:** a complete playable app (vanilla JavaScript, no framework or build step), a Node server backed by PostgreSQL for accounts, sessions, profile, progress and the leaderboard, an automated test suite, and CI.
 
@@ -21,7 +22,8 @@
 | Soft-skill scenarios | 12 branching-choice scenarios. Each option awards XP to one to three skills. First choice counts, replays are practice. |
 | Interactive lessons | 24 lessons: compare-and-explore, step-through code with state, and storyboard flows. +10 XP once each. |
 | Interactive challenges | 12 challenges in six formats: live CSS editor with preview and goal checklist, JavaScript editor that runs tests, type-in blanks, match pairs, put in order, tap the buggy lines. Partial credit, and improving your best score earns the rest of the XP. |
-| Play Lab | DSA labs: **Bubble Sort** (3D, custom arrays) and **Binary Search** (lo/mid/hi markers, choose your target). Each earns XP and a badge once. |
+| AI Code Check | 14 games on six engines (choice, tap-the-line, multi-select, Spec Check, PR review, code fix), 3 bosses, combos, chests and rematches. |
+| Play Lab | JavaScript Trail (12 animated lessons, unlock in order, +20 XP each), Pip's Code Explainers (14 animated concepts) and DSA labs: **Bubble Sort** (3D, custom arrays) and **Binary Search** (lo/mid/hi markers, choose your target). Each earns XP and a badge once. |
 | Leaderboard | Registered players ranked by XP, with photos, your row highlighted. |
 | Profile | Click your avatar to change your name and upload a photo (resized in the browser). |
 | Theme | Light and Dark mode, remembered between visits. |

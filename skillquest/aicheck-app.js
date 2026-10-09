@@ -1,5 +1,5 @@
 /* AI Code Check + Animated (Pip's explainers, JavaScript Trail).
-   Ported from Deepak's version on main and plugged into the XPaddition app (developer-app.js).
+   Ported from Deepak's version on main and plugged into the XPedition app (developer-app.js).
    The host app calls XPAICheck.attach(ctx) once, then XPAICheck.render(view) for the views listed in VIEWS.
    All markup here uses data-ai-* attributes so it never collides with the host's click handler. */
 (function() {
@@ -11,7 +11,7 @@
   var visualId = VISUALS[0].id, visualStep = 0, visualPlaying = false, visualTimer = null;
 
   function fresh() { return { choice: null, items: [], lines: [], verdicts: {}, evidence: {}, activeCriterion: null, scope: false, scopeTouched: false, reviews: {}, code: "", tests: null, result: null }; }
-  function blank() { return { played: [], best: {}, bosses: [], chests: [], rematchAt: {}, combo: 0, bestCombo: 0 }; }
+  function blank() { return { played: [], best: {}, bosses: [], chests: [], rematchAt: {}, combo: 0, bestCombo: 0, waves: {} }; }
   /* Keeps only valid saved values (old saves, other versions, or hand-edited data). */
   function normalize(x) {
     var out = blank();
@@ -22,6 +22,7 @@
     if (Array.isArray(x.chests)) out.chests = x.chests.filter(isGame);
     if (x.best && typeof x.best === "object") Object.keys(x.best).forEach(function(id) { var v = Number(x.best[id]); if (isGame(id) && isFinite(v)) out.best[id] = Math.max(0, Math.min(100, Math.round(v))); });
     if (x.rematchAt && typeof x.rematchAt === "object") Object.keys(x.rematchAt).forEach(function(id) { var v = Number(x.rematchAt[id]); if (isGame(id) && isFinite(v)) out.rematchAt[id] = v; });
+    if (x.waves && typeof x.waves === "object") [1, 2, 3].forEach(function(n) { var v = Number(x.waves[n]); if (isFinite(v) && v > 0) out.waves[n] = Math.min(3, Math.round(v)); });
     out.combo = Math.max(0, Math.floor(Number(x.combo)) || 0); out.bestCombo = Math.max(0, Math.floor(Number(x.bestCombo)) || 0);
     return out;
   }
@@ -51,16 +52,17 @@
 
   /* ---------- navigation ---------- */
   function openView(name) {
-    stopVisualPlayback();
+    stopVisualPlayback(); wave = null;
     if (name === "map") { aiTrack = "core"; ctx.go("aimap"); }
     else if (name === "ai-track") { aiTrack = "ai"; ctx.go("aimap"); }
     else if (name === "jstrail") ctx.go("jstrail");
     else if (name === "cinema") ctx.go("jscinema");
     else if (name === "visuals") ctx.go("visuals");
   }
-  function openGame(id) {
+  function openGame(id, inWave) {
     if (!G[id]) return;
-    if (!canOpen(id)) { ctx.say(isBoss(id) ? "Win 3 games at Okay or better to unlock this boss." : "Beat the earlier boss to open this level."); return; }
+    if (!inWave) wave = null;
+    if (!inWave && !canOpen(id)) { ctx.say(isBoss(id) ? "Win 3 games at Okay or better to unlock this boss." : "Beat the earlier boss to open this level."); return; }
     stopVisualPlayback();
     var v = visualForGame(id); if (v) { visualId = v.id; visualStep = 0; }
     current = id; hint = false; session = fresh();
@@ -68,6 +70,111 @@
     ctx.go("aigame");
   }
   function redraw() { ctx.redraw(); }
+
+  /* ---------- Merge Defender: a story + lives wrapper around a level's games ---------- */
+  var wave = null;
+  var STORY = [
+    { name: "BugBot’s first pull requests", brief: "It’s 2030. AI bots write all the code at Nimbus Corp, and you’re the last human reviewer. BugBot, a careless AI, is sending pull requests. Read each one before it reaches production." },
+    { name: "BugBot says it matches the ticket", brief: "BugBot got smarter and now claims every change matches its ticket. Check each claim against the evidence. Don’t let extras or missing pieces slip into production." },
+    { name: "The 2 AM deploy", brief: "BugBot is deploying on its own and nobody is awake. You write the requirements, check security, and own what ships. This is the last line of defence." }
+  ];
+  function hearts(n) { var h = ""; for (var i = 0; i < 3; i++) h += '<span class="wave-heart ' + (i < n ? "on" : "off") + '" aria-hidden="true">' + (i < n ? "❤️" : "🖤") + '</span>'; return h; }
+  function waveQueue(lv) { var l = LEVELS[lv - 1]; return l.games.concat([l.boss]); }
+  function startWave(lv) {
+    if (!levelOpen(lv)) { ctx.say("Clear the earlier wave’s boss first."); return; }
+    stopVisualPlayback();
+    wave = { level: lv, queue: waveQueue(lv), idx: 0, lives: 3, scores: [], stage: "brief", streak: 0, chestOpened: false, prize: "", newStars: 0 };
+    current = wave.queue[0]; hint = false; session = fresh();
+    ctx.go("aigame");
+  }
+  function beginRound() { wave.stage = "play"; playRound(); }
+  function playRound() {
+    current = wave.queue[wave.idx]; hint = false; session = fresh();
+    if (G[current].kind === "codeFix") session.code = G[current].starterCode;
+    var v = visualForGame(current); if (v) { visualId = v.id; visualStep = 0; }
+    ctx.go("aigame");
+  }
+  function waveStars() {
+    var avg = wave.scores.reduce(function(a, b) { return a + b; }, 0) / Math.max(1, wave.scores.length);
+    return wave.lives <= 0 ? 0 : (avg >= 85 && wave.lives === 3 ? 3 : (avg >= 70 && wave.lives >= 2 ? 2 : 1));
+  }
+  function waveNext() {
+    if (!wave) return;
+    if (wave.lives <= 0) { wave.stage = "down"; redraw(); fx("bad"); return; }
+    if (wave.idx >= wave.queue.length - 1) { finishWave(); return; }
+    wave.idx += 1; playRound();
+  }
+  function finishWave() {
+    var a = A(), stars = waveStars(), old = a.waves[wave.level] || 0;
+    wave.stage = "done"; wave.stars = stars; wave.firstClear = !old;
+    if (stars > old) { a.waves[wave.level] = stars; wave.newStars = stars - old; ctx.addXp(wave.newStars * 20, "javascript"); } else ctx.save();
+    redraw(); fx("win");
+  }
+  function waveBlockedNote(score) {
+    return score >= 60 ? '<div class="wave-verdict blocked"><span>🛡️</span><div><strong>Blocked!</strong> BugBot’s change never reached production.</div></div>'
+      : '<div class="wave-verdict breach"><span>💥</span><div><strong>A bug got into production!</strong> ' + (wave.lives > 0 ? "Production lost a life." : "That was the last life.") + '</div></div>';
+  }
+  function waveHud() {
+    var total = wave.queue.length, left = total - wave.idx - (session.result ? 1 : 0), pct = Math.max(0, Math.round(wave.lives / 3 * 100));
+    return '<section class="wave-hud" aria-label="Merge Defender status"><div class="wave-title"><span>🛡️ MERGE DEFENDER · WAVE ' + wave.level + '</span><strong>' + (wave.idx >= wave.queue.length - 1 ? "Boss PR: " : "PR " + (wave.idx + 1) + " of " + total + ": ") + esc(G[current].title) + '</strong></div>' +
+      '<div class="wave-meter"><span class="wave-label">Production health</span><div class="wave-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i class="' + (wave.lives === 1 ? "danger" : "") + '" style="width:' + pct + '%"></i></div><span class="wave-hearts">' + hearts(wave.lives) + '</span></div>' +
+      '<div class="wave-steps" aria-hidden="true">' + wave.queue.map(function(id, i) { var sc = wave.scores[i]; return '<i class="' + (sc !== undefined ? (sc >= 60 ? "ok" : "bad") : (i === wave.idx ? "now" : "")) + '"></i>'; }).join("") + '</div>' +
+      '<p class="wave-left">' + (left > 0 ? left + " more PR" + (left === 1 ? "" : "s") + " to clear this wave" : "Last PR reviewed") + (wave.streak > 1 ? " · 🔥 " + wave.streak + " blocked in a row" : "") + '</p></section>';
+  }
+  function waveBriefing() {
+    var story = STORY[wave.level - 1], l = LEVELS[wave.level - 1];
+    root().innerHTML = '<div class="dev-game-page ai-scope"><section class="wave-brief"><span class="dev-eyebrow">MISSION BRIEFING · WAVE ' + wave.level + '</span><h1>🛡️ ' + esc(story.name) + '</h1><p>' + esc(story.brief) + '</p>' +
+      '<div class="wave-rules"><div><b>' + wave.queue.length + '</b><small>pull requests</small></div><div><b>3 ❤️</b><small>production lives</small></div><div><b>👑</b><small>boss PR last</small></div></div>' +
+      '<p class="wave-fine">Block a PR with <b>60%+</b>. Miss one and a bug reaches production (−1 life). Lose all three and production goes down, but you can retry instantly with no penalty.</p>' +
+      '<div class="result-actions"><button class="primary-button" data-ai-act="wave-begin">Start Wave ' + wave.level + ' → ' + l.icon + '</button><button class="secondary-button" data-ai-open="map">Not now</button></div></section></div>';
+  }
+  function waveDown() {
+    root().innerHTML = '<div class="dev-game-page ai-scope">' + waveHud() + '<section class="wave-brief wave-down"><span class="wave-big">💥</span><h1>Production is down!</h1><p>BugBot’s code got through. Even the best reviewers have off days, so take another run. Nothing is lost and there is no penalty.</p>' +
+      '<div class="result-actions"><button class="primary-button" data-ai-act="wave-retry">Retry the wave instantly ↻</button><button class="secondary-button" data-ai-open="map">Back to the map</button></div></section></div>';
+  }
+  function waveDone() {
+    var stars = wave.stars, st = "", last = wave.level >= LEVELS.length, bossWon = bossBeat(LEVELS[wave.level - 1].boss);
+    for (var i = 1; i <= 3; i++) st += '<span class="wave-star ' + (i <= stars ? "on" : "off") + '" style="animation-delay:' + (i * 160) + 'ms">★</span>';
+    var chest = wave.chestOpened ? '<div class="chest-opened">🎉 You found <b>' + esc(wave.prize) + '</b> and +25 bonus XP!</div>' : (wave.firstClear ? '<button class="mystery-chest" data-ai-act="wave-chest">📦 Open the wave chest <span>tap for a bonus!</span></button>' : '<div class="chest-opened replay-note">🔁 Replay complete · best ' + (A().waves[wave.level] || stars) + ' ★</div>');
+    root().innerHTML = '<div class="dev-game-page ai-scope">' + waveHud() + '<section class="wave-brief wave-win"><span class="dev-eyebrow">WAVE ' + wave.level + ' CLEARED</span><h1>Production is safe! 🛡️</h1><div class="wave-stars" aria-label="' + stars + ' of 3 stars">' + st + '</div>' +
+      '<p>' + wave.lives + ' of 3 lives left · ' + (wave.newStars ? "+" + wave.newStars * 20 + " XP for new stars" : "no new stars this time") + '.' + (bossWon ? " BugBot’s boss PR is beaten, so the next wave is open." : " Beat the boss PR with 80%+ to open the next wave.") + '</p>' + chest +
+      '<div class="result-actions">' + (bossWon && !last ? '<button class="primary-button" data-ai-act="wave-start" data-ai-level="' + (wave.level + 1) + '">Start Wave ' + (wave.level + 1) + ' →</button>' : '') + '<button class="' + (bossWon && !last ? "secondary-button" : "primary-button") + '" data-ai-act="wave-retry">Defend again ↻</button><button class="secondary-button" data-ai-open="map">Back to the map</button></div></section></div>';
+  }
+  function openWaveChest() {
+    if (!wave || wave.chestOpened || !wave.firstClear) return;
+    var prizes = ["the Last Reviewer badge 🛡️", "a BugBot trophy 🤖", "a golden merge button ✅", "a pixel shield 🛡️"];
+    wave.prize = prizes[Math.floor(Math.random() * prizes.length)]; wave.chestOpened = true;
+    ctx.addXp(25); fx("win"); redraw();
+  }
+
+  /* ---------- game feel: sound, flash, shake, XP pop ---------- */
+  var audio = null;
+  function tone(freq, start, dur, type, vol) {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      audio = audio || new AC(); var o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + start;
+      o.type = type || "sine"; o.frequency.value = freq; g.gain.setValueAtTime(vol || .05, t0); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+      o.connect(g); g.connect(audio.destination); o.start(t0); o.stop(t0 + dur + .02);
+    } catch (e) {}
+  }
+  function fx(kind, xp) {
+    var calm = document.documentElement.classList.contains("reduce-motion"), main = root();
+    if (st().sound) {
+      if (kind === "good") { tone(660, 0, .12); tone(990, .1, .18); }
+      else if (kind === "bad") { tone(200, 0, .22, "sawtooth", .04); tone(140, .16, .26, "sawtooth", .04); }
+      else if (kind === "win") { [523, 659, 784, 1047].forEach(function(f, i) { tone(f, i * .1, .22); }); }
+    }
+    if (!calm && main) {
+      var cls = kind === "bad" ? "fx-shake" : "fx-pulse"; main.classList.remove("fx-shake", "fx-pulse"); void main.offsetWidth; main.classList.add(cls);
+      setTimeout(function() { main.classList.remove(cls); }, 600);
+    }
+    var flash = document.createElement("div"); flash.className = "fx-flash " + (kind === "bad" ? "bad" : "good"); flash.setAttribute("aria-hidden", "true"); document.body.appendChild(flash);
+    setTimeout(function() { if (flash.parentNode) flash.parentNode.removeChild(flash); }, 650);
+    if (xp > 0) {
+      var pop = document.createElement("div"); pop.className = "fx-xp"; pop.textContent = "+" + xp + " XP"; pop.setAttribute("aria-hidden", "true"); document.body.appendChild(pop);
+      setTimeout(function() { if (pop.parentNode) pop.parentNode.removeChild(pop); }, 1300);
+    }
+  }
 
   /* ---------- AI Code Check map ---------- */
   function tile(id) {
@@ -80,13 +187,13 @@
     var locked = !levelOpen(l.id), played = l.games.filter(function(id) { return has(A().played, id); }).length, ok = okayCount(l.id), boss = bossOpen(l.id), beat = bossBeat(l.boss);
     return '<section class="dev-level-card ' + l.color + (locked ? " is-locked" : "") + '"><header class="dev-level-head"><span class="dev-level-icon">' + (locked ? "🔒" : l.icon) + '</span><div class="dev-level-info"><span class="dev-eyebrow">LEVEL ' + l.id + (beat ? " · CLEARED!" : "") + '</span><h2>' + esc(l.name) + '</h2><p>' + esc(l.subtitle) + '</p></div><div class="dev-level-count">' + (locked ? "LOCKED" : played + "/" + l.games.length + " games") + '</div></header>' +
       (locked ? '<div class="dev-locked-note">Beat the Level ' + (l.id - 1) + ' boss to open this zone. 🔒</div>' :
-        '<div class="dev-game-grid">' + l.games.map(tile).join("") + '</div><div class="dev-boss-row ' + (boss ? "boss-ready" : "") + '"><div class="boss-badge">👑</div><div class="boss-info"><strong>BOSS ROUND · ' + esc(G[l.boss].title) + '</strong><span>' + (beat ? "Boss cleared! You did the thing." : (boss ? "Unlocked. Go show what you know." : "Win 3 games at Okay or better · " + ok + "/3 so far")) + '</span></div><button class="boss-button" data-ai-game="' + l.boss + '"' + (!boss ? " disabled" : "") + '>' + (beat ? "Replay" : (boss ? "Fight boss →" : "🔒")) + '</button></div>') + '</section>';
+        '<div class="wave-launch"><div><strong>🛡️ Merge Defender · Wave ' + l.id + '</strong><span>' + esc(STORY[l.id - 1].name) + (A().waves[l.id] ? ' · best ' + '★'.repeat(A().waves[l.id]) + '☆'.repeat(3 - A().waves[l.id]) : '') + '</span></div><button class="primary-button" data-ai-act="wave-start" data-ai-level="' + l.id + '">' + (A().waves[l.id] ? "Defend again" : "Defend production") + ' →</button></div><div class="dev-game-grid">' + l.games.map(tile).join("") + '</div><div class="dev-boss-row ' + (boss ? "boss-ready" : "") + '"><div class="boss-badge">👑</div><div class="boss-info"><strong>BOSS ROUND · ' + esc(G[l.boss].title) + '</strong><span>' + (beat ? "Boss cleared! You did the thing." : (boss ? "Unlocked. Go show what you know." : "Win 3 games at Okay or better · " + ok + "/3 so far")) + '</span></div><button class="boss-button" data-ai-game="' + l.boss + '"' + (!boss ? " disabled" : "") + '>' + (beat ? "Replay" : (boss ? "Fight boss →" : "🔒")) + '</button></div>') + '</section>';
   }
   function mapPage() {
     var subtabs = '<div class="dev-track-tabs"><button class="track-tab ' + (aiTrack === "core" ? "is-active" : "") + '" data-ai-open="map">Developer Core</button><button class="track-tab ' + (aiTrack === "ai" ? "is-active" : "") + '" data-ai-open="ai-track">AI Engineer ✨</button></div>';
     var body = aiTrack === "ai"
       ? '<section class="dev-ai-banner"><span>🧪</span><div><strong>Two teaser games are ready to play.</strong><p>More role packs can be added as content, not new game engines.</p></div></section><section class="dev-ai-games">' + C.aiTrack.games.map(tile).join("") + '</section>'
-      : '<section class="dev-map-intro"><span class="dev-map-mascot">🦊</span><div><strong>Hey, ' + esc(st().name) + '!</strong> Win any 3 games in a level at <b>Okay</b> or better to unlock its boss. Beat the boss to open the next level.</div></section><div class="dev-levels">' + LEVELS.map(levelCard).join("") + '</div>';
+      : '<section class="defender-hero"><span>🛡️</span><div><strong>Merge Defender</strong><p>The year is 2030. AI bots write all the code and you are the last human reviewer. Stop <b>BugBot</b> before its broken code reaches production.</p></div><button class="primary-button" data-ai-act="wave-start" data-ai-level="' + currentLevel() + '">Start Wave ' + currentLevel() + ' →</button></section><section class="dev-map-intro"><span class="dev-map-mascot">🦊</span><div><strong>Hey, ' + esc(st().name) + '!</strong> Win any 3 games in a level at <b>Okay</b> or better to unlock its boss. Beat the boss to open the next level.</div></section><div class="dev-levels">' + LEVELS.map(levelCard).join("") + '</div>';
     root().innerHTML = '<div class="sk ai-scope"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Game Map</h1><p>AI writes the code. Check that it does what the ticket asked, and nothing else.</p></div>' + ctx.trackTabs("ai") + '</section>' +
       '<section class="sk-sec-head"><div><span class="sk-eyebrow">AI CODE CHECK</span><h2>' + (aiTrack === "ai" ? "🤖 AI Engineer teaser" : "Read it · Check it · Own it") + '</h2></div>' + subtabs + '</section>' + body +
       '<p class="dev-fineprint">All code and incidents are fictional demo content. Scores are for practice, not performance reviews.</p></div>';
@@ -104,7 +211,10 @@
   function gameScreen() {
     var g = G[current];
     if (!g) { openView("map"); return; }
-    root().innerHTML = '<div class="dev-game-page ai-scope">' + gameTop(g) + '<section class="dev-game-card"><div class="dev-game-heading"><span class="dev-eyebrow">' + esc(g.skill) + '</span><h1>' + esc(g.title) + '</h1><p>' + esc(g.intro) + '</p></div>' +
+    if (wave && wave.stage === "brief") { waveBriefing(); return; }
+    if (wave && wave.stage === "down") { waveDown(); return; }
+    if (wave && wave.stage === "done") { waveDone(); return; }
+    root().innerHTML = '<div class="dev-game-page ai-scope">' + (wave ? waveHud() : gameTop(g)) + '<section class="dev-game-card"><div class="dev-game-heading"><span class="dev-eyebrow">' + esc(g.skill) + '</span><h1>' + esc(g.title) + '</h1><p>' + esc(g.intro) + '</p></div>' +
       (session.result ? resultCard(g) : body(g)) +
       (!session.result ? '<div class="dev-game-footer"><button class="dev-hint-button" data-ai-act="hint">' + (hint ? "🙈 Hide hint" : "💡 Need a nudge?") + '</button><button class="primary-button" data-ai-act="submit">' + (g.kind === "codeFix" ? "Run the tests" : (g.kind === "specCheck" ? "Check this diff" : (g.kind === "prReview" ? "Send review to DevBot" : "Lock in my answer"))) + ' →</button></div>' + (hint ? '<div class="dev-hint"><b>Pip’s tiny hint:</b> ' + esc(g.concept) + '</div>' : "") : "") +
       '</section>' + renderVisualPlayer((visualForGame(g.id) || VISUALS[0]).id, true) + '</div>';
@@ -151,7 +261,7 @@
     var chest = r.chestOpened ? '<div class="chest-opened">🎉 You found <b>' + esc(r.prize) + '</b> and +25 bonus XP!</div>' : (r.chest ? '<button class="mystery-chest" data-ai-act="chest">📦 Open your mystery chest <span>tap for a bonus!</span></button>' : '<div class="chest-opened replay-note">🔁 Replay complete · best score ' + best + '%</div>');
     return '<div class="dev-result ' + (r.score >= 80 ? "great" : (r.score >= 60 ? "okay" : "retry")) + '"><div class="dev-result-top"><span class="result-sticker">' + (r.score >= 80 ? "🎉" : (r.score >= 60 ? "✨" : "🧩")) + '</span><div><span class="dev-eyebrow">' + r.grade + '</span><h2>' + esc(r.headline) + '</h2></div><div class="score-donut"><strong>' + r.score + '</strong><small>POINTS</small></div></div><p>' + esc(r.explanation) + '</p><div class="concept-card"><span>💡 TAKE THIS WITH YOU</span><strong>' + esc(g.concept) + '</strong></div>' +
       (r.combo > 1 ? '<div class="combo-pop">🔥 Combo ×' + r.combo + (r.bonus ? " · +" + r.bonus + " bonus XP" : "") + '</div>' : "") + '<div class="result-xp">' + (r.xp ? "⚡ +" + r.xp + " XP" : "Practice run · no extra XP") + '</div>' + chest +
-      (r.reply ? '<div class="devbot-reply"><span>🤖 DevBot:</span> ' + esc(r.reply) + '</div>' : "") + '<div class="result-actions"><button class="primary-button" data-ai-act="continue">Keep going →</button><button class="secondary-button" data-ai-act="replay">Play this one again</button><button class="secondary-button" data-ai-open="' + (g.track === "ai" ? "ai-track" : "map") + '">Back to AI Code Check</button></div></div>';
+      (r.reply ? '<div class="devbot-reply"><span>🤖 DevBot:</span> ' + esc(r.reply) + '</div>' : "") + (wave ? waveBlockedNote(r.score) + '<div class="result-actions"><button class="primary-button" data-ai-act="wave-next">' + (wave.lives <= 0 ? "Production is down →" : (wave.idx >= wave.queue.length - 1 ? "See wave results →" : "Next pull request →")) + '</button></div></div>' : '<div class="result-actions"><button class="primary-button" data-ai-act="continue">Keep going →</button><button class="secondary-button" data-ai-act="replay">Play this one again</button><button class="secondary-button" data-ai-open="' + (g.track === "ai" ? "ai-track" : "map") + '">Back to AI Code Check</button></div></div>');
   }
   function submit() {
     var g = G[current], score = 0, reply = "";
@@ -194,28 +304,33 @@
     var text = explanation || (score >= 80 ? "Every check lined up with the evidence. Nice careful review." : "Take another look at the requirement and the evidence.");
     session.result = { score: score, grade: score >= 80 ? "Nailed it!" : (score >= 60 ? "Okay — nice progress!" : "Keep investigating!"), xp: xp + bonus, combo: a.combo, bonus: bonus, headline: boss && score < 80 ? "Boss still has a little health." : (score >= 80 ? "Clean review!" : (score >= 60 ? "You caught the main idea." : "A rematch will be waiting.")), explanation: text, reply: reply, chest: chest, chestOpened: false };
     if (xp + bonus > 0) ctx.addXp(xp + bonus, "javascript"); else ctx.save();
-    if (score >= 80) ctx.beep();
+    if (wave && wave.queue[wave.idx] === g.id) {
+      wave.scores[wave.idx] = score;
+      if (score >= 60) wave.streak += 1; else { wave.lives = Math.max(0, wave.lives - 1); wave.streak = 0; }
+    }
     redraw();
+    fx(score >= 60 ? "good" : "bad", xp + bonus);
   }
   function runCode(g) {
     var editor = document.getElementById("ai-fix-editor");
     if (editor) session.code = editor.value;
     var tests = g.tests.map(function(t) { return { args: testArgs(t), expected: t.expected }; });
-    var workerCode = "self.onmessage=function(e){try{var fn=new Function('return ('+e.data.code+')')();if(typeof fn!=='function')throw new Error('Write a function to test.');var rows=e.data.tests.map(function(t){try{var actual=fn.apply(null,t.args);return{args:t.args,expected:t.expected,actual:actual,pass:JSON.stringify(actual)===JSON.stringify(t.expected)}}catch(x){return{args:t.args,expected:t.expected,actual:x.message,pass:false}}});self.postMessage({rows:rows})}catch(x){self.postMessage({error:x.message})}};";
     try {
-      var url = URL.createObjectURL(new Blob([workerCode], { type: "text/javascript" })), worker = new Worker(url);
+      /* runner-worker.js is served with a policy that blocks all network access from learner code. */
+      var worker = new Worker("runner-worker.js"), done = false;
+      function stop() { done = true; clearTimeout(timeout); worker.terminate(); }
       ctx.say("Running tests in a timed sandbox…");
-      var timeout = setTimeout(function() { worker.terminate(); URL.revokeObjectURL(url); ctx.say("That took too long. Check for a loop."); }, 1500);
+      var timeout = setTimeout(function() { if (done) return; stop(); ctx.say("That took too long. Check for a loop."); }, 1500);
       worker.onmessage = function(e) {
-        clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url);
+        stop();
         if (e.data.error) { session.tests = { all: false, passed: 0, total: tests.length, rows: tests.map(function(t) { return { args: t.args, expected: t.expected, actual: e.data.error, pass: false }; }) }; redraw(); return; }
-        var rows = e.data.rows, passed = rows.filter(function(r) { return r.pass; }).length;
+        var rows = e.data.rows.map(function(r, i) { return { args: tests[i].args, expected: tests[i].expected, actual: r.actual, pass: r.pass }; }), passed = rows.filter(function(r) { return r.pass; }).length;
         session.tests = { all: passed === rows.length, passed: passed, total: rows.length, rows: rows };
         if (passed === rows.length) finish(g, 100, "Every test passes, including the edge case. Nice catch on the missing lower bound.");
         else redraw();
       };
-      worker.onerror = function() { clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url); ctx.say("Couldn’t run that snippet. Check the syntax."); };
-      worker.postMessage({ code: session.code, tests: tests });
+      worker.onerror = function() { stop(); ctx.say("Couldn’t run that snippet. Check the syntax."); };
+      worker.postMessage({ code: session.code, name: g.functionName || "applyCoupon", tests: tests });
     } catch (e) { ctx.say("This browser couldn’t start the code runner."); }
   }
   function openChest() {
@@ -326,6 +441,11 @@
     if (act === "hint") { hint = !hint; redraw(); return; }
     if (act === "submit") { submit(); return; }
     if (act === "chest") { openChest(); return; }
+    if (act === "wave-start") { startWave(Number(actButton.dataset.aiLevel)); return; }
+    if (act === "wave-begin") { beginRound(); return; }
+    if (act === "wave-next") { waveNext(); return; }
+    if (act === "wave-retry") { startWave(wave ? wave.level : currentLevel()); return; }
+    if (act === "wave-chest") { openWaveChest(); return; }
     if (act === "replay") { openGame(current); return; }
     if (act === "continue") { openGame(nextGame()); return; }
     if (act === "visual-select") { selectVisual(actButton.dataset.aiVisual); return; }
