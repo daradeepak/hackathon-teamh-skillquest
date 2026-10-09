@@ -1,0 +1,79 @@
+/* XPaddition polish pass: readable text, one card style, consistent brand, tidier phone layout.
+   Loaded last so it can adjust the other stylesheets without editing them. */
+
+/* ---------- readable text: nothing below 12px ----------
+   Every selector here was set to 10px or less and is not already enlarged later in style.css. */
+.eyebrow, .hero-kicker, .float-chip, .section-heading button, .small-muted, .quest-copy span, .skill-row, .skill-number,
+.world-card strong, .world-card span, .journey-summary, .world-title-copy span, .world-progress, .level-node span,
+.level-node .node-check, .level-node .node-lock, .mission-world, .mission-count, .mission-meta, .tag, .choice-letter,
+.hint-toggle, .tip-box strong, .result-reward, .reflection-area label span, .secondary-button, .big-xp-inner span,
+.progress-skill-head span:last-child, .hero-mascot-bubble, .dev-chip, .dev-speech, .dev-float, .dev-link, .rematch-banner,
+.teaser-panel p, .track-tab, .boss-button, .dev-locked-note, .dev-fineprint, .dev-ai-banner p, .tap-instruction,
+.dev-selected-count, .dev-pick-card strong, .devbot-chat small, .pr-issue-num, .test-expectations span,
+.worker-test-results span, .dev-hint-button, .combo-pop, .result-xp, .mystery-chest, .mystery-chest span, .chest-opened,
+.result-actions .primary-button, .result-actions .secondary-button, .dev-stats-hero p, .dev-skill-title span, .dev-muted,
+.daily-banner-copy small, .dev-daily-banner > b, .lab-level-pill, .lab-feature-row p, .lab-feature-art span,
+.daily-stamp small, .daily-task .secondary-button, .reel-card small, .reel-feedback, .sim-result strong,
+.sim-debrief-row > span, .sk-eyebrow, .sk-player-row span, .sk-level, .sk-card-foot, .sk-played, .sk-pathtag, .sk-say span,
+.sk-learn-state small, .lb-you, .bs-pill, .bs-stats, .bsr-pill, .bsr-idx, .bsr-tags { font-size: 12px; }
+.sk-desc, .sk-note { font-size: 13px; }
+.avatar { font-size: 12px; }
+.top-avatar { font-size: 11px; }
+.nav-count { font-size: 11px; }
+.primary-button { font-size: 13px; }
+
+/* ---------- brand wordmark ---------- */
+.brand-name { letter-spacing: -.2px; }
+
+/* ---------- Tarun's sections (sk-*) and the leaderboard: brand colours, corners and shadows ----------
+   Layout is unchanged; only the palette and surfaces now match the AI Code Check cards. */
+.sk { --sk-blue: #5946cf; --sk-blue-soft: #efedff; --sk-line: #e9e2f0; --sk-track: #ece7f6; --sk-card: #fff; }
+.sk-grid { border-radius: 18px; box-shadow: 0 5px 16px rgba(73, 52, 109, .05); }
+.sk-card:hover { background: #f7f3ff; }
+.sk-icon { border-radius: 12px; }
+.sk-played { color: var(--sk-muted); }
+.sk-scene { border-radius: 19px; box-shadow: 0 5px 16px rgba(73, 52, 109, .05); }
+.sk-option, .sk-match, .sk-tile, .sk-slot, .sk-insight, .sk-others li, .sk-learn-state div, .sk-say { border-radius: 12px; }
+.sk-pathbtn { border-radius: 15px; box-shadow: 0 3px 10px rgba(73, 52, 109, .035); }
+.sk-letter, .sk-match b { border-radius: 8px; }
+.sk-option:hover, .sk-tile:hover, .sk-match:hover, .sk-pathbtn:hover { border-color: #c9b9f5; }
+.sk-option.picked { background: #f7f3ff; box-shadow: 0 0 0 2px rgba(112, 92, 232, .15); }
+.sk-slot.filled, .sk-match.paired { background: #f7f3ff; }
+.sk-dots i.past { background: #c9b9f5; }
+.sk-card:focus-visible, .sk-option:focus-visible, .sk-codeline:focus-visible, .sk-tile:focus-visible, .sk-slot:focus-visible,
+.sk-match:focus-visible, .sk-blank:focus-visible, .sk-editor:focus-visible, .sk-pathbtn:focus-visible,
+.sk-learn-tab:focus-visible { outline-color: #a79aff; }
+
+.lb-list { border-radius: 18px; box-shadow: 0 5px 16px rgba(73, 52, 109, .05); }
+.lb-row.me { background: #f3efff; box-shadow: inset 4px 0 #705ce8; }
+.lb-you { background: #5946cf; }
+.lb-xp { color: #5946cf; }
+
+/* ---------- dark mode touch-ups (the invert filter itself lives in theme.css) ----------
+   Flip these back so the coral buttons and Pip keep their real colours. */
+html[data-theme="dark"] .primary-button, html[data-theme="dark"] .dev-mascot { filter: invert(1) hue-rotate(180deg); }
+
+/* ---------- phone: five equal nav tabs ---------- */
+@media (max-width: 760px) {
+  .sidebar { padding-left: 8px; padding-right: 8px; }
+  .brand { padding: 0 8px; }
+  .main-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-top: 10px; overflow: visible; }
+  .nav-item { flex-direction: column; justify-content: center; gap: 4px; min-width: 0; min-height: 56px; padding: 8px 2px; font-size: 11px; letter-spacing: -.1px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-icon { width: auto; font-size: 17px; }
+  .nav-item:hover, .nav-item.is-active { box-shadow: inset 0 -3px #7454d1; }
+}
+
+/* ---------- phone: one-line top bar ---------- */
+@media (max-width: 620px) {
+  .nav-item { font-size: 11px; }
+  .breadcrumb { display: none; }
+  .topbar { height: 60px; }
+  .topbar-right { width: 100%; gap: 8px; }
+  .account-toggle { max-width: none; min-height: 40px; margin-right: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+  /* Show only the speaker emoji; the wide word gap pushes "Sound on/off" out of view but keeps it as the button's name. */
+  .sound-toggle { flex: none; width: 40px; height: 40px; min-height: 40px; padding: 0 0 0 10px; overflow: hidden; border-radius: 50%; white-space: nowrap; text-align: left; font-size: 16px; word-spacing: 60px; }
+  .theme-toggle { flex: none; width: 40px; height: 40px; }
+  .top-avatar { flex: none; width: 36px; height: 36px; }
+  /* Pip's speech bubble covered the hero text on narrow screens. */
+  .dev-speech { display: none; }
+}
