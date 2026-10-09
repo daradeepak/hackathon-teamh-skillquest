@@ -6,7 +6,7 @@
   "use strict";
   var C = window.XP_AICHECK, G = C.games, LEVELS = C.coreLevels;
   var VISUALS = window.DEVQUEST_VISUALS.items, JS_LESSONS = window.DEVQUEST_JS_LESSONS.lessons, ALL_VISUALS = VISUALS.concat(JS_LESSONS);
-  var VIEWS = ["aimap", "aigame", "jstrail", "jscinema", "visuals"], VISUAL_VIEWS = ["aigame", "jscinema", "visuals"];
+  var VIEWS = ["aimap", "aigame", "jstrail", "jscinema", "visuals", "radar"], VISUAL_VIEWS = ["aigame", "jscinema", "visuals"];
   /* Question pools (aicheck-pools.js): each game has several versions with a difficulty from 1 (easy) to 3 (hard). */
   var POOLS = window.XP_AICHECK_POOLS || { base: {}, variants: {} };
   var round = null, recent = {};
@@ -28,7 +28,7 @@
   var visualId = VISUALS[0].id, visualStep = 0, visualPlaying = false, visualTimer = null;
 
   function fresh() { return { choice: null, items: [], lines: [], verdicts: {}, evidence: {}, activeCriterion: null, scope: false, scopeTouched: false, reviews: {}, code: "", tests: null, result: null }; }
-  function blank() { return { played: [], best: {}, bosses: [], chests: [], rematchAt: {}, combo: 0, bestCombo: 0, waves: {} }; }
+  function blank() { return { played: [], best: {}, bosses: [], chests: [], rematchAt: {}, combo: 0, bestCombo: 0, waves: {}, radar: [] }; }
   /* Keeps only valid saved values (old saves, other versions, or hand-edited data). */
   function normalize(x) {
     var out = blank();
@@ -40,6 +40,7 @@
     if (x.best && typeof x.best === "object") Object.keys(x.best).forEach(function(id) { var v = Number(x.best[id]); if (isGame(id) && isFinite(v)) out.best[id] = Math.max(0, Math.min(100, Math.round(v))); });
     if (x.rematchAt && typeof x.rematchAt === "object") Object.keys(x.rematchAt).forEach(function(id) { var v = Number(x.rematchAt[id]); if (isGame(id) && isFinite(v)) out.rematchAt[id] = v; });
     if (x.waves && typeof x.waves === "object") [1, 2, 3].forEach(function(n) { var v = Number(x.waves[n]); if (isFinite(v) && v > 0) out.waves[n] = Math.min(3, Math.round(v)); });
+    if (Array.isArray(x.radar)) out.radar = x.radar.filter(function(r) { return r && typeof r === "object"; }).slice(0, 10).map(function(r) { return { at: Math.max(0, Math.floor(Number(r.at)) || 0), c: Math.max(0, Math.min(5, Math.floor(Number(r.c)) || 0)), t: Math.max(0, Math.min(200, Math.floor(Number(r.t)) || 0)) }; });
     out.combo = Math.max(0, Math.floor(Number(x.combo)) || 0); out.bestCombo = Math.max(0, Math.floor(Number(x.bestCombo)) || 0);
     return out;
   }
@@ -69,7 +70,7 @@
 
   /* ---------- navigation ---------- */
   function openView(name) {
-    stopVisualPlayback(); wave = null;
+    stopVisualPlayback(); stopRadar(); wave = null;
     if (name === "map") { aiTrack = "core"; ctx.go("aimap"); }
     else if (name === "ai-track") { aiTrack = "ai"; ctx.go("aimap"); }
     else if (name === "jstrail") ctx.go("jstrail");
@@ -170,6 +171,93 @@
     var prizes = ["the Last Reviewer badge 🛡️", "a BugBot trophy 🤖", "a golden merge button ✅", "a pixel shield 🛡️"];
     wave.prize = prizes[Math.floor(Math.random() * prizes.length)]; wave.chestOpened = true;
     ctx.addXp(25); fx("win"); redraw();
+  }
+
+  /* ---------- Bug Radar: a 5-question timed skill check, retaken to show measurable progress ---------- */
+  var RADAR_SECONDS = 20, radar = null, radarTimer = null;
+  function radarList() { var a = A(); if (!Array.isArray(a.radar)) a.radar = []; return a.radar; }
+  function stopRadar() { if (radarTimer) clearInterval(radarTimer); radarTimer = null; }
+  /* Same difficulty mix every time: easy, easy, medium, medium, hard. */
+  function radarQuestions() {
+    var hard = Math.random() < .5 ? "predict-output" : "spot-bug";
+    return [["predict-output", 1], ["spot-bug", 1], ["predict-output", 2], ["spot-bug", 2], [hard, 3]].map(function(q) { return pickVersion(q[0], q[1], []); });
+  }
+  function startRadar() {
+    stopVisualPlayback(); stopRadar(); wave = null;
+    radar = { qs: radarQuestions(), i: 0, pick: null, lines: [], correct: [], secs: [], startAt: Date.now(), done: false, saved: null };
+    ctx.go("radar");
+  }
+  function radarTick() {
+    if (!radar || radar.done) { stopRadar(); return; }
+    if (ctx.view() !== "radar") { stopRadar(); radar = null; return; }
+    var left = Math.max(0, RADAR_SECONDS - (Date.now() - radar.startAt) / 1000), bar = document.querySelector(".radar-time i"), txt = document.querySelector(".radar-time b");
+    if (bar) bar.style.width = (left / RADAR_SECONDS * 100) + "%";
+    if (txt) txt.textContent = Math.ceil(left) + "s";
+    if (left <= 0) radarLock(true);
+  }
+  function radarLock(timedOut) {
+    var q = radar.qs[radar.i], ok = false, secs = Math.min(RADAR_SECONDS, (Date.now() - radar.startAt) / 1000);
+    if (!timedOut) {
+      if (q.kind === "choice") ok = radar.pick === q.answer;
+      else ok = radar.lines.length === q.badLines.length && q.badLines.every(function(n) { return has(radar.lines, n); });
+    }
+    radar.correct.push(ok); radar.secs.push(timedOut ? RADAR_SECONDS : secs);
+    fx(ok ? "good" : "bad");
+    if (radar.i >= radar.qs.length - 1) { finishRadar(); return; }
+    radar.i += 1; radar.pick = null; radar.lines = []; radar.startAt = Date.now();
+    redraw();
+  }
+  function finishRadar() {
+    stopRadar(); radar.done = true;
+    var list = radarList(), c = radar.correct.filter(Boolean).length, avg = radar.secs.reduce(function(a, b) { return a + b; }, 0) / radar.secs.length;
+    radar.saved = { at: Date.now(), c: c, t: Math.round(avg * 10) };
+    var first = !list.length;
+    list.push(radar.saved); while (list.length > 10) list.splice(1, 1); /* always keep the first attempt as the baseline */
+    radar.first = first;
+    if (first) ctx.addXp(30); else ctx.save();
+    redraw(); fx("win");
+  }
+  function secsText(t) { return (t / 10).toFixed(1).replace(/\.0$/, "") + " s"; }
+  function radarCompare() {
+    var list = radarList();
+    if (list.length < 2) return '<p class="radar-note">This is your <b>starting point</b>. Play a few waves, then retake the radar to see how far you’ve come.</p>';
+    var a = list[0], b = list[list.length - 1], dc = b.c - a.c, dt = a.t ? Math.round((a.t - b.t) / a.t * 100) : 0;
+    return '<div class="radar-compare"><div><span>DAY 1</span><strong>' + a.c + '/5</strong><small>' + secsText(a.t) + ' each</small></div><div class="radar-arrow">→</div><div class="now"><span>NOW</span><strong>' + b.c + '/5</strong><small>' + secsText(b.t) + ' each</small></div></div>' +
+      '<p class="radar-note">' + (dc > 0 ? "You catch <b>" + dc + " more bug" + (dc === 1 ? "" : "s") + "</b> than on day 1" : (dc === 0 ? "Same accuracy as day 1" : "A little lower than day 1 this time")) + (dt > 0 ? ", and you’re <b>" + dt + "% faster</b>." : ".") + '</p>';
+  }
+  function radarBars() {
+    return '<div class="radar-bars" aria-label="Bug Radar attempts">' + radarList().map(function(r, i) { return '<div class="radar-bar" title="Attempt ' + (i + 1) + ': ' + r.c + '/5"><i style="height:' + Math.max(6, r.c * 20) + '%"></i><small>' + (i === 0 ? "D1" : "#" + (i + 1)) + '</small></div>'; }).join("") + '</div>';
+  }
+  function radarPage() {
+    if (!radar) { root().innerHTML = '<div class="ai-scope"><section class="wave-brief"><span class="wave-big">📡</span><h1>Bug Radar</h1><p>Five quick questions, ' + RADAR_SECONDS + ' seconds each: predict what AI-written code returns and find its bugs. Take it now and again later to measure your progress.</p><div class="result-actions"><button class="primary-button" data-ai-act="radar-start">Start the radar →</button><button class="secondary-button" data-nav="stats">Back to Progress</button></div></section></div>'; return; }
+    if (radar.done) {
+      var s = radar.saved;
+      root().innerHTML = '<div class="ai-scope"><section class="wave-brief wave-win"><span class="dev-eyebrow">BUG RADAR COMPLETE</span><h1>' + s.c + ' of 5 caught 📡</h1><p>Average ' + secsText(s.t) + ' per question.' + (radar.first ? " +30 XP for setting your baseline." : "") + '</p>' + radarCompare() + radarBars() +
+        '<div class="result-actions"><button class="primary-button" data-ai-act="wave-start" data-ai-level="' + currentLevel() + '">Practise in Merge Defender →</button><button class="secondary-button" data-nav="stats">See Progress</button></div></section></div>';
+      return;
+    }
+    var q = radar.qs[radar.i], body;
+    if (q.kind === "choice") body = code(q.code) + '<h2 class="dev-question">' + esc(q.question) + '</h2><div class="dev-choices">' + q.options.map(function(x, i) { return '<button class="dev-choice ' + (radar.pick === i ? "picked" : "") + '" data-ai-rchoice="' + i + '"><span class="choice-letter">' + String.fromCharCode(65 + i) + '</span><span>' + esc(x) + '</span></button>'; }).join("") + '</div>';
+    else body = '<div class="tap-instruction">Tap every buggy line.</div><div class="dev-code-list">' + q.code.map(function(line, i) { var yes = has(radar.lines, i); return '<button class="dev-code-line ' + (yes ? "selected" : "") + '" data-ai-rline="' + i + '"><span class="line-no">' + (i + 1) + '</span><code>' + esc(line) + '</code><span class="line-mark">' + (yes ? "✦" : "") + '</span></button>'; }).join("") + '</div>';
+    var ready = q.kind === "choice" ? radar.pick !== null : radar.lines.length > 0;
+    var left = Math.max(0, RADAR_SECONDS - (Date.now() - radar.startAt) / 1000);
+    root().innerHTML = '<div class="dev-game-page ai-scope"><section class="wave-hud radar-hud"><div class="wave-title"><span>📡 BUG RADAR · QUESTION ' + (radar.i + 1) + ' OF ' + radar.qs.length + '</span><strong>' + esc(q.intro) + '</strong></div><div class="radar-time"><div class="wave-bar"><i style="width:' + (left / RADAR_SECONDS * 100) + '%"></i></div><b>' + Math.ceil(left) + 's</b></div>' +
+      '<div class="wave-steps" aria-hidden="true">' + radar.qs.map(function(_, i) { return '<i class="' + (i < radar.i ? (radar.correct[i] ? "ok" : "bad") : (i === radar.i ? "now" : "")) + '"></i>'; }).join("") + '</div></section>' +
+      '<section class="dev-game-card">' + body + '<div class="dev-game-footer"><span></span><button class="primary-button" data-ai-act="radar-lock"' + (ready ? "" : " disabled") + '>Lock in →</button></div></section></div>';
+    if (!radarTimer) radarTimer = setInterval(radarTick, 250);
+  }
+  function homeCard() {
+    var lv = currentLevel(), a = A(), story = STORY[lv - 1], list = radarList(), last = list[list.length - 1];
+    var stars = LEVELS.map(function(l) { var n = a.waves[l.id] || 0, open = levelOpen(l.id); return '<span class="home-wave ' + (open ? "" : "locked") + '"><small>Wave ' + l.id + '</small><b>' + (open ? "★".repeat(n) + "☆".repeat(3 - n) : "🔒") + '</b></span>'; }).join("");
+    return '<section class="defender-home ai-scope"><div class="defender-home-main"><span class="dev-eyebrow">🛡️ MERGE DEFENDER · WAVE ' + lv + '</span><h2>' + esc(story.name) + '</h2><p>AI writes the code. You’re the last human reviewer. Production health: <b>❤️❤️❤️ 3/3</b></p>' +
+      '<div class="home-waves">' + stars + '</div><div class="result-actions"><button class="primary-button" data-ai-act="wave-start" data-ai-level="' + lv + '">Defend production →</button>' +
+      (last ? '<button class="secondary-button" data-ai-act="radar-start">📡 Bug Radar · last ' + last.c + '/5 · retake</button>' : '<button class="secondary-button" data-ai-act="radar-start">📡 See where you start · 2 min</button>') + '</div></div><div class="defender-home-art" aria-hidden="true">🤖<span>🛡️</span></div></section>';
+  }
+  function progressCard() {
+    var list = radarList();
+    return '<section class="dev-panel radar-panel ai-scope"><div class="dev-panel-head"><h3>📡 Bug Radar</h3><span>Measured skill, not just XP</span></div>' +
+      (list.length ? radarCompare() + radarBars() + '<div class="result-actions"><button class="primary-button" data-ai-act="radar-start">Retake the radar (2 min) →</button></div>'
+        : '<p class="radar-note">A 2-minute check of how well you read AI-written code: 5 questions, ' + RADAR_SECONDS + ' seconds each. Take it now, then again after some practice, and watch the numbers move.</p><div class="result-actions"><button class="primary-button" data-ai-act="radar-start">Take the Bug Radar →</button></div>') + '</section>';
   }
 
   /* ---------- game feel: sound, flash, shake, XP pop ---------- */
@@ -470,6 +558,12 @@
     if (act === "hint") { hint = !hint; redraw(); return; }
     if (act === "submit") { submit(); return; }
     if (act === "chest") { openChest(); return; }
+    if (act === "radar-start") { startRadar(); return; }
+    if (act === "radar-lock") { if (radar && !radar.done) radarLock(false); return; }
+    var rChoice = t.closest("[data-ai-rchoice]");
+    if (rChoice && radar && !radar.done) { radar.pick = Number(rChoice.dataset.aiRchoice); redraw(); return; }
+    var rLine = t.closest("[data-ai-rline]");
+    if (rLine && radar && !radar.done) { var rn = Number(rLine.dataset.aiRline); radar.lines = has(radar.lines, rn) ? radar.lines.filter(function(x) { return x !== rn; }) : radar.lines.concat([rn]); redraw(); return; }
     if (act === "wave-start") { startWave(Number(actButton.dataset.aiLevel)); return; }
     if (act === "wave-begin") { beginRound(); return; }
     if (act === "wave-next") { waveNext(); return; }
@@ -524,6 +618,7 @@
     attach: function(hostContext) { ctx = hostContext; },
     label: function(v) {
       if (v === "aimap") return "Game Map · AI Code Check";
+      if (v === "radar") return "Progress · Bug Radar";
       if (v === "aigame") return G[current] ? cur().title : "AI Code Check";
       if (v === "jstrail") return "Animated · JavaScript Trail";
       if (v === "jscinema") return "Animated · JS Code Cinema";
@@ -531,12 +626,16 @@
     },
     render: function(v) {
       if (VISUAL_VIEWS.indexOf(v) < 0) stopVisualPlayback();
-      if (v === "aimap") mapPage();
+      if (v !== "radar") stopRadar();
+      if (v === "radar") radarPage();
+      else if (v === "aimap") mapPage();
       else if (v === "aigame") gameScreen();
       else if (v === "jstrail") jsTrailPage();
       else if (v === "jscinema") jsCinemaPage();
       else if (v === "visuals") visualsPage();
     },
+    homeCard: homeCard,
+    progressCard: progressCard,
     stop: stopVisualPlayback
   };
 })();
