@@ -377,7 +377,7 @@
   }
 
   function resetProgress() {
-    if (!window.confirm("Reset your SkillQuest demo progress in this browser?")) return;
+    if (!window.confirm("Reset your XPaddition demo progress in this browser?")) return;
     storageState = { xp: 0, completed: [], results: {}, reflections: {} };
     saveState();
     setView("home");
