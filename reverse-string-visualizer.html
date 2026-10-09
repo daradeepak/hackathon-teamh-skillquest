@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reverse String – Two Pointers Visualizer</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e8eaf0; --muted:#8b93a7;
+    --accent:#6ea8fe; --left:#4ade80; --right:#fb923c; --swap:#f472b6; --done:#3b4252;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f5f6f8; --panel:#fff; --line:#d9dde5; --text:#1b1f27; --muted:#667085; --done:#e3e6ec; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px 16px 40px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 2px}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .input-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .input-row input{flex:1;min-width:180px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:16px ui-monospace,Menlo,Consolas,monospace}
+  button{padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);cursor:pointer;font:inherit}
+  button:hover:not(:disabled){border-color:var(--accent)}
+  button:disabled{opacity:.4;cursor:default}
+  button.primary{background:var(--accent);color:#0b1020;border-color:var(--accent);font-weight:600}
+  .stage{margin-top:14px;padding:34px 8px 20px;overflow-x:auto}
+  .cells{display:flex;justify-content:center;gap:6px;min-width:min-content;margin:0 auto}
+  .cell{position:relative;width:46px;flex:0 0 46px}
+  .box{height:52px;border:2px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;
+       font:600 22px ui-monospace,Menlo,Consolas,monospace;background:var(--bg);transition:transform .35s ease,background .25s,border-color .25s,opacity .25s}
+  .idx{text-align:center;font-size:12px;color:var(--muted);margin-top:4px}
+  .ptr{position:absolute;left:0;right:0;top:-30px;text-align:center;font-size:12px;font-weight:700;opacity:0;transition:opacity .2s}
+  .ptr::after{content:"▼";display:block;line-height:1;font-size:11px}
+  .ptr.l{color:var(--left)} .ptr.r{color:var(--right)}
+  .cell.L .box{border-color:var(--left)} .cell.R .box{border-color:var(--right)}
+  .cell.L .ptr.l, .cell.R .ptr.r{opacity:1}
+  .cell.L.R .ptr.l{left:-12px;right:auto;width:46px} .cell.L.R .ptr.r{left:12px;right:auto;width:46px}
+  .cell.cmp .box{background:color-mix(in srgb,var(--accent) 18%,var(--bg))}
+  .cell.swap .box{background:color-mix(in srgb,var(--swap) 30%,var(--bg));border-color:var(--swap)}
+  .cell.done .box{background:var(--done);border-color:var(--done)}
+  .cell.swap.up .box{transform:translateY(-8px)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+  pre{margin:0;font:13.5px/1.7 ui-monospace,Menlo,Consolas,monospace;overflow-x:auto}
+  .ln{display:block;padding:0 8px;border-left:3px solid transparent;white-space:pre}
+  .ln.on{background:color-mix(in srgb,var(--accent) 16%,transparent);border-left-color:var(--accent)}
+  .state{font:14px ui-monospace,Menlo,Consolas,monospace}
+  .state div{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line)}
+  .state b{color:var(--accent)}
+  #msg{min-height:44px;margin:0 0 10px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  .controls label{margin-left:auto;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:8px}
+  input[type=range]{accent-color:var(--accent)}
+  .bar{height:6px;background:var(--line);border-radius:3px;margin-top:12px;overflow:hidden}
+  .bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  .result{font:600 20px ui-monospace,Menlo,Consolas,monospace;text-align:center;margin-top:6px;letter-spacing:2px;min-height:28px}
+  .err{color:#f87171;font-size:13px;margin-top:6px;min-height:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Reverse a String In-Place</h1>
+  <p class="sub">Two-pointer technique · type any string and watch it get reversed step by step (visualization only)</p>
+
+  <div class="card">
+    <div class="input-row">
+      <input id="inp" value="hello world" maxlength="20" aria-label="Input string" spellcheck="false" autocomplete="off">
+      <button class="primary" id="load">Load</button>
+      <button id="rand">Random word</button>
+    </div>
+    <div class="err" id="err"></div>
+
+    <div class="stage"><div class="cells" id="cells"></div></div>
+    <div class="result" id="result"></div>
+    <div class="bar"><i id="prog"></i></div>
+
+    <div class="controls">
+      <button id="first" title="Restart">⏮</button>
+      <button id="prev" title="Step back">◀ Step</button>
+      <button class="primary" id="play">▶ Play</button>
+      <button id="next" title="Step forward">Step ▶</button>
+      <button id="last" title="Jump to end">⏭</button>
+      <label>Speed <input type="range" id="speed" min="1" max="10" value="5"></label>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <p id="msg"></p>
+      <div class="state" id="state"></div>
+    </div>
+    <div class="card"><pre id="code"></pre></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const CODE = [
+    "function reverse(s) {",
+    "  let l = 0, r = s.length - 1;",
+    "  while (l < r) {",
+    "    let tmp = s[l];",
+    "    s[l] = s[r];",
+    "    s[r] = tmp;",
+    "    l++; r--;",
+    "  }",
+    "}"
+  ];
+  const $ = id => document.getElementById(id);
+  const codeEl = $("code");
+  codeEl.innerHTML = CODE.map((t,i)=>`<span class="ln" data-i="${i}"><span style="color:var(--muted)">${i+1}  </span>${t.replace(/</g,"&lt;")}</span>`).join("");
+
+  let chars = [], steps = [], pos = 0, timer = null;
+
+  // Precompute every step as an immutable snapshot, so stepping back works too.
+  function build(str){
+    const a = [...str];
+    const n = a.length;
+    const out = [];
+    const snap = (line, msg, extra) => out.push(Object.assign({
+      arr:a.slice(), line, msg, l:null, r:null, tmp:null, swap:false, done:new Set(), cmp:false
+    }, extra));
+    const doneSet = () => new Set(done);
+    let done = [];
+    let l = 0, r = n - 1;
+    snap(0, `Start with "${str}" (${n} characters).`, {});
+    if (n < 2){
+      snap(1, n ? "Only one character – already reversed." : "Empty string – nothing to do.", {done:new Set(a.map((_,i)=>i))});
+      return out;
+    }
+    snap(1, `Place <b>l</b> at index 0 and <b>r</b> at index ${r}.`, {l, r});
+    let tmp = null;
+    while (l < r){
+      snap(2, `Is l (${l}) &lt; r (${r})? Yes, keep going.`, {l, r, cmp:true, done:doneSet()});
+      tmp = a[l];
+      snap(3, `Save <b>s[${l}] = "${disp(tmp)}"</b> in tmp.`, {l, r, tmp, done:doneSet()});
+      a[l] = a[r];
+      snap(4, `Copy <b>s[${r}] = "${disp(a[r])}"</b> into position ${l}.`, {l, r, tmp, swap:true, done:doneSet()});
+      a[r] = tmp;
+      snap(5, `Write tmp <b>"${disp(tmp)}"</b> into position ${r}. Swap complete.`, {l, r, tmp, swap:true, done:doneSet()});
+      done.push(l, r);
+      const nl = l + 1, nr = r - 1;
+      snap(6, `Move pointers inward: l → ${nl}, r → ${nr}.`, {l:nl, r:nr, tmp, done:doneSet()});
+      l = nl; r = nr;
+    }
+    if (l === r) done.push(l);
+    snap(2, `Is l (${l}) &lt; r (${r})? No – pointers have met. Loop ends.`, {l, r, cmp:true, done:doneSet()});
+    snap(8, `Done! The string is now <b>"${a.join("")}"</b>.`, {done:new Set(a.map((_,i)=>i))});
+    return out;
+  }
+  const disp = c => c === " " ? "␣" : c;
+
+  function load(){
+    const v = $("inp").value;
+    if (!v.length){ $("err").textContent = "Enter at least one character."; return; }
+    $("err").textContent = "";
+    stop();
+    chars = [...v];
+    steps = build(v);
+    pos = 0;
+    drawCells();
+    render();
+  }
+
+  function drawCells(){
+    $("cells").innerHTML = chars.map((c,i)=>
+      `<div class="cell" data-i="${i}"><div class="ptr l">l</div><div class="ptr r">r</div>
+       <div class="box"></div><div class="idx">${i}</div></div>`).join("");
+  }
+
+  function render(){
+    const s = steps[pos];
+    const cells = $("cells").children;
+    for (let i=0;i<cells.length;i++){
+      const c = cells[i];
+      c.className = "cell";
+      c.firstElementChild;
+      c.querySelector(".box").textContent = disp(s.arr[i]);
+      if (s.l === i) c.classList.add("L");
+      if (s.r === i) c.classList.add("R");
+      if (s.cmp && (s.l === i || s.r === i)) c.classList.add("cmp");
+      if (s.swap && (s.l === i || s.r === i)) c.classList.add("swap","up");
+      if (s.done.has(i) && !(s.swap && (s.l===i||s.r===i))) c.classList.add("done");
+    }
+    document.querySelectorAll(".ln").forEach(el => el.classList.toggle("on", +el.dataset.i === s.line));
+    $("msg").innerHTML = s.msg;
+    $("state").innerHTML =
+      `<div><span>l</span><b>${s.l ?? "–"}</b></div>
+       <div><span>r</span><b>${s.r ?? "–"}</b></div>
+       <div><span>tmp</span><b>${s.tmp == null ? "–" : '"'+disp(s.tmp)+'"'}</b></div>
+       <div><span>step</span><b>${pos+1} / ${steps.length}</b></div>`;
+    $("prog").style.width = (steps.length>1 ? pos/(steps.length-1)*100 : 100) + "%";
+    $("result").textContent = pos === steps.length-1 ? s.arr.join("") : "";
+    $("first").disabled = $("prev").disabled = pos === 0;
+    $("next").disabled = $("last").disabled = pos === steps.length-1;
+    $("play").textContent = timer ? "⏸ Pause" : (pos === steps.length-1 ? "↺ Replay" : "▶ Play");
+  }
+
+  function delay(){ return 1300 - $("speed").value * 115; }
+  function tick(){
+    if (pos < steps.length-1){ pos++; render(); timer = setTimeout(tick, delay()); }
+    else stop();
+  }
+  function stop(){ if (timer){ clearTimeout(timer); timer = null; } if (steps.length) render(); }
+  function play(){
+    if (timer){ stop(); return; }
+    if (pos === steps.length-1) pos = 0;
+    render();
+    timer = setTimeout(tick, delay());
+    render();
+  }
+
+  $("load").onclick = load;
+  $("inp").addEventListener("keydown", e => { if (e.key === "Enter") load(); });
+  $("rand").onclick = () => {
+    const w = ["algorithm","pointer","reverse","visualize","interview","sandwich","racecar","stack overflow"];
+    $("inp").value = w[Math.floor(Math.random()*w.length)]; load();
+  };
+  $("play").onclick = play;
+  $("next").onclick = () => { stop(); if (pos < steps.length-1){ pos++; render(); } };
+  $("prev").onclick = () => { stop(); if (pos > 0){ pos--; render(); } };
+  $("first").onclick = () => { stop(); pos = 0; render(); };
+  $("last").onclick = () => { stop(); pos = steps.length-1; render(); };
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" && e.target.type === "text") return;
+    if (e.code === "Space"){ e.preventDefault(); play(); }
+    if (e.key === "ArrowRight") $("next").click();
+    if (e.key === "ArrowLeft") $("prev").click();
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
