@@ -37,6 +37,11 @@ test("saved AI Code Check progress is validated", () => {
   assert.deepStrictEqual(p.jsLessons, []);
 });
 
+test("Merge Defender wave stars are validated", () => {
+  const p = sanitizeProgress({ aicheck: { waves: { 1: 3, 2: 99, 3: -1, 9: 3 } } });
+  assert.deepStrictEqual(p.aicheck.waves, { 1: 3, 2: 3 });
+});
+
 test("completing every AI Code Check game fits under the XP cap", () => {
   const total = Object.values(games).reduce((sum, g) => sum + g.xp, 0);
   assert.ok(MAX_XP > total);
