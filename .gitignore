@@ -1,10 +1,12 @@
-# local data and secrets
+# Local account database (created by server.js; contains password hashes)
 skillquest/data/accounts.json
 skillquest/data/*.tmp
+
+# Secrets
 .env
 .env.*
-!.env.example
-# tooling
-node_modules/
+
+# OS and tooling
 .DS_Store
+node_modules/
 .vercel/

@@ -18,11 +18,13 @@ npm test               # API, security and content tests (needs a test database)
 | `index.html` | Page shell: sidebar, top bar, content root |
 | `developer-app.js` | All app logic: state, views, lesson and challenge engines, scoring, accounts, leaderboard, profile, theme |
 | `developer-games.js` | Content: skills, scenarios, challenges and lessons (with the XP each option awards) |
-| `developer-js-lessons.js` | The 12-lesson JavaScript learn trail |
+| `developer-js-lessons.js` | The 12-lesson JavaScript learn trail (also the animated JavaScript Trail) |
+| `aicheck-app.js` | AI Code Check games, JavaScript Trail and Pip's explainers; plugs into `developer-app.js` |
+| `aicheck-games.js`, `developer-visuals.js` | AI Code Check content and Pip's animated explainers |
 | `bubble-sort.js` / `.css`, `binary-search.js` / `.css` | The two DSA labs under Play Lab |
-| `runner-worker.js` | Runs learner JavaScript against tests in a Web Worker (no network access) |
+| `runner-worker.js` | Runs learner JavaScript (Technical Skills and the AI Code Check Code Fix boss) against tests in a Web Worker (no network access) |
 | `theme-init.js` | Applies the saved light/dark theme before first paint |
-| `style.css`, `skills.css`, `theme.css` | Styles (the labs scope theirs under `.bs` and `.bsr`) |
+| `style.css`, `skills.css`, `aicheck.css`, `theme.css`, `polish.css` | Styles (the labs scope theirs under `.bs` and `.bsr`) |
 | `server.js` | Static files plus the API: register, login, logout, me, progress, profile, leaderboard, health |
 | `lib/db.js` | PostgreSQL pool and versioned schema migrations |
 | `lib/progress.js` | Validates and caps saved progress against the game content |
