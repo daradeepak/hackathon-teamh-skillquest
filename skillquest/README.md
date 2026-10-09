@@ -13,7 +13,7 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 
 ## What is playable
 
-- Developer Core: Read It, Check It, and Direct It & Own It.
+- Game map has two sections: **Soft Skills** (Developer Core: Read It, Check It, and Direct It & Own It, plus the Choose Your Move workplace story and the AI Engineer teaser) and **DSA** (Bubble Sort, which opens the animated visualizer).
 - A boss challenge unlocks after three games in a level reach an Okay score; clearing a boss opens the next level.
 - Mini-games include code comprehension, tap-the-bug, acceptance-criteria checks, test review, security review, and a scripted pull-request review.
 - The Code Fix boss runs user-edited JavaScript in a time-limited Web Worker.

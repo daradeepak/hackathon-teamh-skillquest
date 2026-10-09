@@ -153,21 +153,22 @@
     if (G[id].kind === "codeFix") session.code = G[id].starterCode;
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
-  function go(where) { if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  var sortBack = "anim";
+  var LAB_VIEWS = ["lab", "daily", "reels", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
+  function go(where) { if (where === "sort") sortBack = view === "map" ? "map" : "anim"; if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function draw() {
     if (view === "home") { label.textContent = "Home"; home(); if (LAB_ENABLED) root.insertAdjacentHTML("afterbegin", dailyBanner()); }
-    else if (view === "map") { label.textContent = "Game map"; track === "ai" ? aiMap() : map(); }
+    else if (view === "map") { label.textContent = "Game map"; track === "ai" ? aiMap() : (track === "dsa" ? dsaMap() : map()); }
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
     else if (view === "anim") { label.textContent = "Animated"; animatedPage(); }
-    else if (view === "sort") { label.textContent = "Animated · DSA"; sortPage(); }
+    else if (view === "sort") { label.textContent = sortBack === "map" ? "Game map · DSA" : "Animated · DSA"; sortPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = G[current] ? G[current].title : "Game"; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && view === "sort")); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (view === "sim" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === (sortBack === "map" ? "map" : "anim") && view === "sort")); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     syncAccountUi();
     var sound = document.querySelector("[data-action='sound']");
@@ -194,9 +195,16 @@
       '</div></div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">BONUS TRACK PREVIEW</span><h3>🤖 AI Engineer</h3><p>Same game engines, fresh AI challenges. Take a peek at two teaser games.</p><button class="secondary-button" data-action="ai">Check out the track →</button></div></section>';
   }
   function map() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR DEVELOPER CORE</span><h1>Three levels. One useful superpower.</h1><p>Read the code. Check the ticket. Own what ships.</p></div><div class="dev-track-tabs"><button class="track-tab is-active" data-action="core">Developer Core</button><button class="track-tab" data-action="ai">AI Engineer ✨</button></div></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SOFT SKILLS · DEVELOPER CORE</span><h1>Three levels. One useful superpower.</h1><p>Read the code. Check the ticket. Own what ships.</p></div><div class="dev-track-tabs"><button class="track-tab is-active" data-action="core">Soft Skills</button><button class="track-tab" data-action="dsa">DSA</button></div></section>' +
       '<section class="dev-map-intro"><span class="dev-map-mascot">🦊</span><div><strong>Hey, ' + esc(state.name) + '!</strong> Win any 3 games in a level at <b>Okay</b> or better to unlock its boss. Beat the boss to open the next level.</div></section>' +
-      '<div class="dev-levels">' + D.coreLevels.map(levelCard).join("") + '</div><p class="dev-fineprint">All code and incidents are fictional demo content. Scores are for practice, not performance reviews.</p>';
+      '<div class="dev-levels">' + D.coreLevels.map(levelCard).join("") + '</div><div class="lab-module-grid">' + moduleCard("sim", "🎭", "Choose Your Move", "BRANCHING STORY", "Three workplace moments. Your choices change the debrief.", state.simulator.done ? "Replay story" : "Continue story") + '<button class="lab-module-card ai-module" data-action="ai"><span class="lab-module-icon">🤖</span><span class="lab-module-tag">BONUS TRACK</span><strong>AI Engineer</strong><small>Two teaser games with fresh AI-specific challenges.</small><span class="lab-module-go">Take a peek →</span></button></div><p class="dev-fineprint">All code and incidents are fictional demo content. Scores are for practice, not performance reviews.</p>';
+  }
+  function dsaMap() {
+    var done = state.sortLab.bubble.done;
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">DATA STRUCTURES & ALGORITHMS</span><h1>See how algorithms really work.</h1><p>Step through the code, watch the data move, and earn XP for finishing.</p></div><div class="dev-track-tabs"><button class="track-tab" data-action="core">Soft Skills</button><button class="track-tab is-active" data-action="dsa">DSA</button></div></section>' +
+      '<section class="dev-level-card lavender"><header class="dev-level-head"><span class="dev-level-icon">🧮</span><div class="dev-level-info"><span class="dev-eyebrow">SORTING</span><h2>DSA</h2><p>Animated walkthroughs with the real code beside them.</p></div><div class="dev-level-count">' + (done ? 1 : 0) + '/1 done</div></header>' +
+      '<div class="dev-game-grid"><button class="dev-game-tile ' + (done ? "played" : "") + '" data-module="sort"><span class="dev-game-icon">🫧</span><span class="dev-game-text"><strong>Bubble Sort</strong><small>ANIMATED · O(n²)</small></span><span class="dev-game-status">' + (done ? "✓" : "→") + '</span></button></div></section>' +
+      '<p class="dev-fineprint">More algorithms will be added here over time.</p>';
   }
   function levelCard(l) {
     var locked = !levelOpen(l.id), played = l.games.filter(function(id) { return has(state.played, id); }).length, ok = okayCount(l.id), boss = bossOpen(l.id), beat = bossBeat(l.boss);
@@ -205,7 +213,7 @@
         '<div class="dev-game-grid">' + l.games.map(function(id) { return tile(id, false); }).join("") + '</div><div class="dev-boss-row ' + (boss ? "boss-ready" : "") + '"><div class="boss-badge">👑</div><div class="boss-info"><strong>BOSS ROUND · ' + esc(G[l.boss].title) + '</strong><span>' + (beat ? "Boss cleared! You did the thing." : (boss ? "Unlocked. Go show what you know." : "Win 3 games at Okay or better · " + ok + "/3 so far")) + '</span></div><button class="boss-button" data-game="' + l.boss + '"' + (!boss ? " disabled" : "") + '>' + (beat ? "Replay" : (boss ? "Fight boss →" : "🔒")) + '</button></div>') + '</section>';
   }
   function aiMap() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SPECIALIZATION PREVIEW</span><h1>🤖 AI Engineer</h1><p>Same game engines, fresh AI-specific challenges.</p></div><div class="dev-track-tabs"><button class="track-tab" data-action="core">Developer Core</button><button class="track-tab is-active">AI Engineer ✨</button></div></section><section class="dev-ai-banner"><span>🧪</span><div><strong>Two teaser games are ready to play.</strong><p>More role packs can be added as content, not new game engines.</p></div></section><section class="dev-ai-games">' + D.aiTrack.games.map(function(id) { return tile(id, false); }).join("") + '</section><button class="dev-link" data-action="core">← Back to Developer Core</button>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SPECIALIZATION PREVIEW</span><h1>🤖 AI Engineer</h1><p>Same game engines, fresh AI-specific challenges.</p></div><div class="dev-track-tabs"><button class="track-tab is-active" data-action="core">Soft Skills</button><button class="track-tab" data-action="dsa">DSA</button></div></section><section class="dev-ai-banner"><span>🧪</span><div><strong>Two teaser games are ready to play.</strong><p>More role packs can be added as content, not new game engines.</p></div></section><section class="dev-ai-games">' + D.aiTrack.games.map(function(id) { return tile(id, false); }).join("") + '</section><button class="dev-link" data-action="core">← Back to Soft Skills</button>';
   }
   function stats() {
     var ids = Object.keys(state.best), avg = ids.length ? Math.round(ids.reduce(function(s, id) { return s + state.best[id]; }, 0) / ids.length) : 0;
@@ -253,7 +261,7 @@
       '<section class="lab-footer-tip"><span>💡</span><p><b>More topics are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
   }
   function sortPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>DSA 🧮 <small>Bubble Sort</small></h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section><div id="bubble-sort-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>DSA 🧮 <small>Bubble Sort</small></h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="' + sortBack + '">← ' + (sortBack === "map" ? "Game map" : "Animated") + '</button></section><div id="bubble-sort-host"></div>';
   }
   function mountSortLab() {
     var host = document.getElementById("bubble-sort-host");
@@ -284,11 +292,11 @@
   function simulatorPage() {
     var s = state.simulator;
     if (s.done) {
-      root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">STORY COMPLETE · DEBRIEF TIME</span><h1>You handled the moment 🎬</h1><p>Real work is messy. Good decisions come from evidence, scope, and people.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section><section class="sim-result"><div class="sim-result-mascot">🦊</div><div><span class="dev-eyebrow">YOUR TEAMWORK SCORE</span><h2>' + s.score + ' / 6 points</h2><p>' + (s.score >= 5 ? 'Calm, clear, and careful. Pip approves.' : 'Every choice is practice. Try another path and compare the outcome.') + '</p><strong>+ ' + (s.reward || 0) + ' XP earned</strong></div></section><div class="sim-debrief">' + (s.choices || []).map(function(c, i) { return '<div class="sim-debrief-row"><span>' + (i + 1) + '</span><div><strong>' + esc(c.option) + '</strong><small>' + esc(c.feedback) + '</small></div></div>'; }).join('') + '</div><button class="primary-button" data-action="sim-restart">Play the story again ↻</button>';
+      root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">STORY COMPLETE · DEBRIEF TIME</span><h1>You handled the moment 🎬</h1><p>Real work is messy. Good decisions come from evidence, scope, and people.</p></div><button class="dev-link" data-nav="map">← Game map</button></section><section class="sim-result"><div class="sim-result-mascot">🦊</div><div><span class="dev-eyebrow">YOUR TEAMWORK SCORE</span><h2>' + s.score + ' / 6 points</h2><p>' + (s.score >= 5 ? 'Calm, clear, and careful. Pip approves.' : 'Every choice is practice. Try another path and compare the outcome.') + '</p><strong>+ ' + (s.reward || 0) + ' XP earned</strong></div></section><div class="sim-debrief">' + (s.choices || []).map(function(c, i) { return '<div class="sim-debrief-row"><span>' + (i + 1) + '</span><div><strong>' + esc(c.option) + '</strong><small>' + esc(c.feedback) + '</small></div></div>'; }).join('') + '</div><button class="primary-button" data-action="sim-restart">Play the story again ↻</button>';
       return;
     }
     var i = Math.min(s.stage, SIM_STEPS.length - 1), step = SIM_STEPS[i];
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">WORKPLACE SIMULATOR · SCENE ' + (i + 1) + ' OF ' + SIM_STEPS.length + '</span><h1>Choose Your Move 🎭</h1><p>Your choices change the debrief. There’s no timer and no real-world risk.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">WORKPLACE SIMULATOR · SCENE ' + (i + 1) + ' OF ' + SIM_STEPS.length + '</span><h1>Choose Your Move 🎭</h1><p>Your choices change the debrief. There’s no timer and no real-world risk.</p></div><button class="dev-link" data-nav="map">← Game map</button></section>' +
       '<div class="sim-scene-track">' + SIM_STEPS.map(function(_, j) { return '<span class="' + (j < i ? 'complete' : (j === i ? 'active' : '')) + '"></span>'; }).join('') + '</div>' +
       (s.last ? '<div class="sim-last-feedback">💬 ' + esc(s.last) + '</div>' : '') +
       '<section class="sim-scene"><div class="sim-scene-person">' + (i === 0 ? '🧑‍💻' : (i === 1 ? '🧑‍🤝‍🧑' : '🦊')) + '</div><span class="dev-eyebrow">' + step.speaker + '</span><h2>' + step.text + '</h2><div class="sim-options">' + step.options.map(function(x, j) { return '<button class="sim-option" data-sim-choice="' + j + '"><span>' + String.fromCharCode(65 + j) + '</span>' + x + '<b>→</b></button>'; }).join('') + '</div><small class="sim-score-hint">Current team points: ' + s.score + ' · pick what you’d really do.</small></section>';
@@ -507,6 +515,7 @@
     else if (action === "sim-restart") { state.simulator = { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 }; save(); draw(); }
     else if (action === "ai") { track = "ai"; go("map"); }
     else if (action === "core") { track = "core"; go("map"); }
+    else if (action === "dsa") { track = "dsa"; go("map"); }
     else if (action === "evidence") { session.activeCriterion = Number(actionButton.dataset.index); draw(); }
     var choice = e.target.closest("[data-choice]");
     if (choice && !session.result) { session.choice = Number(choice.dataset.choice); draw(); return; }
