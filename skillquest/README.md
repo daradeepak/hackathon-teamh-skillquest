@@ -21,7 +21,7 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 - Animated → DSA → Bubble Sort: a 3D step-by-step visualizer with play, pause, step, scrub, speed control and custom arrays. Watching every step earns +40 XP and the Sort Sprinter badge once.
 - XP, combos, rematches, the scoreboard, sound toggle, and a mystery-chest reward.
 - Local account registration, sign-in, sign-out, password hashing, and server-backed progress saving.
-- Play Lab adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
+- Play Lab (temporarily hidden; set `LAB_ENABLED = true` in `developer-app.js` and restore its sidebar button and home banner to bring it back) adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
 - Complete a mission, collect a reel, and finish the story to unlock the daily +80 XP reward. Reel, story, quest, and badge progress saves in this browser.
 
 Everything is fictional demo content. Accounts are stored in a local JSON file, not a hosted service. This is a localhost prototype and is not intended for production or real passwords.

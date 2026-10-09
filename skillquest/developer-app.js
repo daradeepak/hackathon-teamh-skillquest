@@ -153,9 +153,10 @@
     if (G[id].kind === "codeFix") session.code = G[id].starterCode;
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  function go(where) { view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
+  function go(where) { if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function draw() {
-    if (view === "home") { label.textContent = "Home"; home(); root.insertAdjacentHTML("afterbegin", dailyBanner()); }
+    if (view === "home") { label.textContent = "Home"; home(); if (LAB_ENABLED) root.insertAdjacentHTML("afterbegin", dailyBanner()); }
     else if (view === "map") { label.textContent = "Game map"; track === "ai" ? aiMap() : map(); }
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
