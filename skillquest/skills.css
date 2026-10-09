@@ -65,6 +65,26 @@
 .sk-others li .sk-gains { grid-column: 2; margin-top: 2px; }
 .sk-others li em { color: var(--sk-blue); font-style: normal; font-weight: 700; }
 
+/* technical challenges */
+.sk-hint { margin: 4px 0 10px; color: var(--sk-muted); font-size: 12px; }
+.sk-code { margin: 0 0 14px; padding: 14px 16px; border-radius: 8px; background: #121a2b; color: #dfe7ff; font: 12.5px/1.7 ui-monospace, "SF Mono", Menlo, Consolas, monospace; overflow-x: auto; }
+.sk-code code { font: inherit; white-space: pre; }
+.sk-codelines { display: grid; gap: 2px; padding: 10px 0; border-radius: 8px; background: #121a2b; }
+.sk-codeline { display: flex; gap: 12px; align-items: baseline; width: 100%; padding: 4px 14px; border: 0; border-left: 3px solid transparent; background: transparent; color: #dfe7ff; text-align: left; cursor: pointer; font: 12.5px/1.7 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.sk-codeline span { flex: none; width: 18px; color: #6f7ca3; text-align: right; }
+.sk-codeline code { font: inherit; white-space: pre; }
+.sk-codeline:hover { background: rgba(255, 255, 255, .06); }
+.sk-codeline.picked { background: rgba(255, 99, 99, .18); border-left-color: #ff6b6b; }
+.sk-codeline:focus-visible, .sk-tile:focus-visible, .sk-slot:focus-visible { outline: 3px solid #a9bdf2; outline-offset: 1px; }
+.sk-slots, .sk-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.sk-slot { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; min-height: 40px; padding: 8px 12px; border: 1.5px dashed var(--sk-line); border-radius: 8px; background: #fff; color: var(--sk-ink); font: 600 12.5px ui-monospace, Menlo, monospace; }
+.sk-slot b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--sk-blue-soft); color: var(--sk-blue); font: 800 11px 'DM Sans', sans-serif; }
+.sk-slot.filled { border-style: solid; border-color: var(--sk-blue); background: #f1f5ff; cursor: pointer; }
+.sk-tile { min-height: 40px; padding: 8px 14px; border: 1px solid var(--sk-line); border-radius: 8px; background: #fff; color: var(--sk-ink); font: 600 12.5px ui-monospace, Menlo, monospace; cursor: pointer; box-shadow: 0 2px 0 var(--sk-line); transition: transform .12s; }
+.sk-tile:hover { transform: translateY(-2px); border-color: #9db3ec; }
+.sk-score { margin: 4px 0 8px; color: var(--sk-blue); font-size: 40px; }
+.sk-subhead { margin-top: 18px; }
+
 @media (max-width: 900px) {
   .sk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sk-card:nth-child(3n) { border-right: 1px solid var(--sk-line); }

@@ -1,11 +1,11 @@
 (function() {
   "use strict";
-  var D = window.DEVQUEST_CONTENT, SKILLS = D.skills, SCEN = D.scenarios, root = document.getElementById("app-main");
+  var D = window.DEVQUEST_CONTENT, SKILLS = D.skills, SCEN = D.scenarios, TECH = D.techSkills, CHAL = D.challenges, root = document.getElementById("app-main");
   var label = document.getElementById("page-label"), toast = document.getElementById("toast");
   var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "core", hint = false;
   var account = null, accountMode = "login";
-  var SKILL_BY_ID = {}, SCEN_BY_ID = {};
-  SKILLS.forEach(function(k) { SKILL_BY_ID[k.id] = k; }); SCEN.forEach(function(x) { SCEN_BY_ID[x.id] = x; });
+  var SKILL_BY_ID = {}, SCEN_BY_ID = {}, CHAL_BY_ID = {};
+  SKILLS.concat(TECH).forEach(function(k) { SKILL_BY_ID[k.id] = k; }); SCEN.forEach(function(x) { SCEN_BY_ID[x.id] = x; }); CHAL.forEach(function(x) { CHAL_BY_ID[x.id] = x; });
   var timer = null, session = fresh(), reelIndex = 0, reelRevealed = false, reelAnswer = null, reelFeedback = "";
   var REELS = [
     { id: "trace", title: "Trace before you trust", tag: "CODE READING", icon: "🔎", hook: "AI says this returns 12. Can you spot the tiny twist?", lesson: "Follow the values line by line. Here, the loop adds each price multiplied by its quantity. A test can pass while your mental model is still off.", question: "For items [{price: 2, qty: 3}, {price: 4, qty: 1}], what is the total?", options: ["9", "10", "14"], answer: 1 },
@@ -18,22 +18,25 @@
     { speaker: "Pip 🦊 · Client call", text: "A client is upset about a missed deadline and starts raising their voice. What happens first?", options: ["Stay calm, acknowledge their frustration, and say what you’ll do next.", "Explain all the reasons it wasn’t your fault.", "End the call until they calm down."], points: [2, 1, 0], feedback: ["Yes. Acknowledging feelings first lowers the temperature, and a clear next step rebuilds trust.", "Explanations can sound like excuses before the person feels heard.", "Ending the call can make a bad moment worse. Stay steady and keep it constructive."] }
   ];
   function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) } }; }
-  function fresh() { return { choice: null, result: null }; }
-  function zeroSkills() { var o = {}; SKILLS.forEach(function(k) { o[k.id] = 0; }); return o; }
+  function fresh() { return { choice: null, lines: [], order: [], result: null }; }
+  function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
   function blankProgress(name) {
-    return { name: name || "Learner", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, daily: { date: dayKey(), actions: [], claimed: false },
+    return { name: name || "Learner", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, daily: { date: dayKey(), actions: [], claimed: false },
       reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 } };
   }
   /* Accepts saved progress from this or an older version and keeps only values that are still valid. */
   function normalize(p, name) {
     if (!p || typeof p !== "object" || Array.isArray(p)) return null;
-    var base = blankProgress(name || p.name), skills = zeroSkills(), chosen = {};
-    SKILLS.forEach(function(k) { var v = p.skills && Number(p.skills[k.id]); if (isFinite(v) && v > 0) skills[k.id] = Math.min(Math.floor(v), 1000000); });
+    var base = blankProgress(name || p.name), skills = zeroSkills(), chosen = {}, tech = {};
+    SKILLS.concat(TECH).forEach(function(k) { var v = p.skills && Number(p.skills[k.id]); if (isFinite(v) && v > 0) skills[k.id] = Math.min(Math.floor(v), 1000000); });
     if (p.scenarios && typeof p.scenarios === "object") Object.keys(p.scenarios).forEach(function(id) {
       var sc = SCEN_BY_ID[id], c = p.scenarios[id];
       if (sc && Number.isInteger(c) && c >= 0 && c < sc.options.length) chosen[id] = c;
     });
-    return Object.assign(base, { xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
+    if (p.tech && typeof p.tech === "object") Object.keys(p.tech).forEach(function(id) {
+      var v = Number(p.tech[id]); if (CHAL_BY_ID[id] && isFinite(v) && v > 0) tech[id] = Math.min(100, Math.round(v));
+    });
+    return Object.assign(base, { tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
       reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}) });
   }
   function seed() { return blankProgress("Learner"); }
@@ -135,7 +138,10 @@
     "problem-solving": '<path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/>',
     "collaboration": '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c3 0 6 1.5 6 5"/>',
     "time-management": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    "decision-making": '<path d="M12 3l9 9-9 9-9-9z"/><circle cx="12" cy="12" r="2.5"/>'
+    "decision-making": '<path d="M12 3l9 9-9 9-9-9z"/><circle cx="12" cy="12" r="2.5"/>',
+    "html": '<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',
+    "css": '<path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M12 12l8-4M12 12v9M12 12L4 8"/>',
+    "javascript": '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 10v5a2 2 0 01-2 2M14 17c.5 1 1.3 1.2 2 1.2 1.1 0 1.8-.6 1.8-1.5 0-2-3.8-1.3-3.8-3.5 0-.9.7-1.5 1.8-1.5.8 0 1.5.3 2 1"/>'
   };
   function skillIcon(id) { return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (SKILL_ICONS[id] || "") + '</svg>'; }
   function levelInfo(xp, at) {
@@ -150,27 +156,33 @@
     var pool = skillId ? SCEN.filter(function(x) { return x.skill === skillId; }) : SCEN;
     return (pool.find(function(x) { return !played(x.id); }) || pool[0]).id;
   }
+  function techBest(id) { return state.tech[id] || 0; }
+  function techDone(id) { return techBest(id) >= 60; }
+  function nextChallenge(skillId) {
+    var pool = skillId ? CHAL.filter(function(x) { return x.skill === skillId; }) : CHAL;
+    return (pool.find(function(x) { return !techDone(x.id); }) || pool.find(function(x) { return techBest(x.id) < 100; }) || pool[0]).id;
+  }
   function open(id) {
-    if (!SCEN_BY_ID[id]) return;
+    if (!SCEN_BY_ID[id] && !CHAL_BY_ID[id]) return;
+    track = CHAL_BY_ID[id] ? "tech" : "core";
     current = id; view = "game"; session = fresh();
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  var sortBack = "anim";
   var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
-  function go(where) { if (where === "sort") sortBack = view === "map" ? "map" : "anim"; if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function go(where) { if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function draw() {
     if (view === "home") { label.textContent = "Home"; home(); if (LAB_ENABLED) root.insertAdjacentHTML("afterbegin", dailyBanner()); }
-    else if (view === "map") { label.textContent = track === "dsa" ? "Animated · DSA" : "Skills"; track === "dsa" ? dsaMap() : map(); }
+    else if (view === "map") { label.textContent = "Skills"; track === "tech" ? techMap() : map(); }
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
-    else if (view === "anim") { label.textContent = "Animated"; animatedPage(); }
-    else if (view === "sort") { label.textContent = sortBack === "map" ? "Skills · DSA" : "Animated · DSA"; sortPage(); }
+    else if (view === "anim") { label.textContent = "Play Lab"; animatedPage(); }
+    else if (view === "sort") { label.textContent = "Play Lab · DSA"; sortPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
-    else { label.textContent = SCEN_BY_ID[current] ? SCEN_BY_ID[current].title : "Scenario"; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === (sortBack === "map" ? "map" : "anim") && view === "sort")); });
+    else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || (view === "game" && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && view === "sort")); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     syncAccountUi();
     var sound = document.querySelector("[data-action='sound']");
@@ -185,36 +197,43 @@
     root.innerHTML =
       '<section class="dev-welcome"><div class="dev-wave">👋</div><div class="dev-welcome-copy"><span class="dev-eyebrow">SOFT SKILLS</span><h1>Hey ' + esc(state.name) + '! Ready to practice a real-life moment?</h1><p>Short scenarios that build the people skills great teams run on.</p></div><div class="dev-top-stats"><span class="dev-chip xp-chip">⚡ ' + state.xp + ' XP</span><span class="dev-chip">🏅 Level ' + pl.n + ' · ' + esc(pl.name) + '</span></div></section>' +
       '<section class="dev-hero"><div class="dev-hero-copy"><span class="dev-hero-tag">💬 NEXT UP · ' + esc(next.title.toUpperCase()) + '</span><h2>What would you do<br>in this moment?</h2><p>Read a short workplace scenario and choose the approach that feels like you. There are no wrong answers. Each choice builds different skills.</p><button class="primary-button dev-play-button" data-action="continue">Play next scenario →</button></div><div class="dev-hero-art"><div class="dev-orbit"></div><div class="dev-mascot">🦊</div><div class="dev-speech">Pip: how would that land?</div><span class="dev-float f1">✨ ' + done + '/' + total + ' played</span><span class="dev-float f2">+ XP</span></div></section>' +
-      '<section class="dev-bottom-grid"><div class="dev-panel"><div class="dev-panel-head"><h3>🧠 Your skills</h3><button class="dev-link" data-nav="map">See all →</button></div>' + SKILLS.map(skillRow).join("") + '</div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>🧮 DSA</h3><p>Watch algorithms move, step by step, with the real code beside them.</p><button class="secondary-button" data-action="dsa">Open DSA →</button></div></section>';
+      '<section class="dev-bottom-grid"><div class="dev-panel"><div class="dev-panel-head"><h3>🧠 Your skills</h3><button class="dev-link" data-nav="map">See all →</button></div>' + SKILLS.map(skillRow).join("") + '</div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>💻 Technical Skills</h3><p>Game-style challenges in HTML, CSS and JavaScript. Earn XP for every one you crack.</p><button class="secondary-button" data-action="tech">Open Technical Skills →</button></div></section>';
   }
   function trackTabs(active) {
-    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button><button class="track-tab ' + (active === "dsa" ? "is-active" : "") + '" data-action="dsa">DSA</button></div>';
+    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button></div>';
   }
   function skillCard(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT), list = SCEN.filter(function(x) { return x.skill === k.id; }), done = list.filter(function(x) { return played(x.id); }).length;
     return '<button type="button" class="sk-card" data-skill="' + k.id + '"><span class="sk-card-top"><span class="sk-icon">' + skillIcon(k.id) + '</span><span class="sk-level">LEVEL ' + info.n + '</span></span><strong>' + esc(k.name) + '</strong><span class="sk-desc">' + esc(k.desc) + '</span>' +
       '<span class="sk-card-foot"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></span><span class="sk-bar"><i style="width:' + info.pct + '%"></i></span><span class="sk-played">' + done + ' of ' + list.length + ' scenarios played</span></button>';
   }
-  function map() {
-    var pl = playerLevel(), done = SCEN.filter(function(x) { return played(x.id); }).length;
-    root.innerHTML = '<div class="sk"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Skills</h1><p>Your professional skills grow independently as you complete relevant scenarios.</p></div>' + trackTabs("core") + '</section>' +
+  function capabilityPage(tab, description, cards, cta, note) {
+    var pl = playerLevel();
+    return '<div class="sk"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Skills</h1><p>' + description + '</p></div>' + trackTabs(tab) + '</section>' +
       '<section class="sk-player"><div class="sk-player-level"><span class="sk-eyebrow">PLAYER LEVEL</span><strong>' + pl.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>Level ' + pl.n + ' — ' + esc(pl.name) + '</h2><span>' + state.xp + (pl.next === null ? " XP" : " / " + pl.next + " XP") + '</span></div>' +
       '<div class="sk-bar" role="progressbar" aria-label="Progress to the next player level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pl.pct + '"><i style="width:' + pl.pct + '%"></i></div><p>' + esc(pl.blurb) + '</p></div></section>' +
-      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">INDIVIDUAL PROGRESSION</span><h2>Skill Levels</h2></div><button class="primary-button" data-action="continue">Play next scenario →</button></div><div class="sk-grid">' + SKILLS.map(skillCard).join("") + '</div>' +
-      '<p class="sk-note">Pick a skill to practise it. There are no right or wrong answers: each choice builds the skills it shows. ' + done + ' of ' + SCEN.length + ' scenarios played.</p></section></div>';
+      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">INDIVIDUAL PROGRESSION</span><h2>' + (tab === "tech" ? "Technical Skill Levels" : "Skill Levels") + '</h2></div><button class="primary-button" data-action="' + cta[0] + '">' + cta[1] + '</button></div><div class="sk-grid">' + cards + '</div><p class="sk-note">' + note + '</p></section></div>';
   }
-  function dsaMap() {
-    var done = state.sortLab.bubble.done;
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">DATA STRUCTURES & ALGORITHMS</span><h1>See how algorithms really work.</h1><p>Step through the code, watch the data move, and earn XP for finishing.</p></div><div class="dev-track-tabs"><button class="track-tab" data-action="core">Soft Skills</button><button class="track-tab is-active" data-action="dsa">DSA</button></div></section>' +
-      '<section class="dev-level-card lavender"><header class="dev-level-head"><span class="dev-level-icon">🧮</span><div class="dev-level-info"><span class="dev-eyebrow">SORTING</span><h2>DSA</h2><p>Animated walkthroughs with the real code beside them.</p></div><div class="dev-level-count">' + (done ? 1 : 0) + '/1 done</div></header>' +
-      '<div class="dev-game-grid"><button class="dev-game-tile ' + (done ? "played" : "") + '" data-module="sort"><span class="dev-game-icon">🫧</span><span class="dev-game-text"><strong>Bubble Sort</strong><small>ANIMATED · O(n²)</small></span><span class="dev-game-status">' + (done ? "✓" : "→") + '</span></button></div></section>' +
-      '<p class="dev-fineprint">More algorithms will be added here over time.</p>';
+  function map() {
+    var done = SCEN.filter(function(x) { return played(x.id); }).length;
+    root.innerHTML = capabilityPage("core", "Your professional skills grow independently as you complete relevant scenarios.", SKILLS.map(skillCard).join(""), ["continue", "Play next scenario →"],
+      'Pick a skill to practise it. There are no right or wrong answers: each choice builds the skills it shows. ' + done + ' of ' + SCEN.length + ' scenarios played.');
+  }
+  function techCard(k) {
+    var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT), list = CHAL.filter(function(x) { return x.skill === k.id; }), done = list.filter(function(x) { return techDone(x.id); }).length;
+    return '<button type="button" class="sk-card" data-tech="' + k.id + '"><span class="sk-card-top"><span class="sk-icon">' + skillIcon(k.id) + '</span><span class="sk-level">LEVEL ' + info.n + '</span></span><strong>' + esc(k.name) + '</strong><span class="sk-desc">' + esc(k.desc) + '</span>' +
+      '<span class="sk-card-foot"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></span><span class="sk-bar"><i style="width:' + info.pct + '%"></i></span><span class="sk-played">' + done + ' of ' + list.length + ' challenges cleared</span></button>';
+  }
+  function techMap() {
+    var done = CHAL.filter(function(x) { return techDone(x.id); }).length;
+    root.innerHTML = capabilityPage("tech", "Sharpen your front-end skills with quick, game-style challenges.", TECH.map(techCard).join(""), ["continue-tech", "Play next challenge →"],
+      'Pick a skill to start a challenge. Score 60% or more to clear it, and improve your best score to earn the rest of its XP. ' + done + ' of ' + CHAL.length + ' challenges cleared.');
   }
   function stats() {
     var pl = playerLevel(), list = SCEN.filter(function(x) { return played(x.id); }), top = SKILLS.slice().sort(function(a, b) { return state.skills[b.id] - state.skills[a.id]; })[0];
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR SCOREBOARD</span><h1>Nice work, ' + esc(state.name) + ' ✨</h1><p>Stats track practice. They’re not a work-performance score.</p></div><button class="secondary-button" data-action="reset">Reset progress</button></section>' +
       '<section class="dev-stats-hero"><div><span class="dev-rank-pill">🏅 ' + esc(pl.name) + '</span><h2>' + state.xp + ' <small>XP</small></h2><p>Keep exploring different approaches. Every choice builds something.</p></div><div class="dev-stat-stack"><div><strong>🏅 ' + pl.n + '</strong><span>player level</span></div><div><strong>🎯 ' + list.length + '/' + SCEN.length + '</strong><span>scenarios played</span></div><div><strong>⭐ ' + (state.skills[top.id] ? esc(top.name) : "—") + '</strong><span>top skill</span></div></div></section>' +
-      '<div class="dev-stats-grid"><section class="dev-panel"><div class="dev-panel-head"><h3>🧠 Skill levels</h3><span>XP by skill</span></div>' + SKILLS.map(skillRow).join("") + '</section>' +
+      '<div class="dev-stats-grid"><section class="dev-panel"><div class="dev-panel-head"><h3>🧠 Skill levels</h3><span>XP by skill</span></div>' + SKILLS.map(skillRow).join("") + '<div class="dev-panel-head sk-subhead"><h3>💻 Technical skills</h3></div>' + TECH.map(skillRow).join("") + '</section>' +
       '<section class="dev-panel"><div class="dev-panel-head"><h3>🗒️ Recent scenarios</h3><span>Your approach</span></div>' + (list.length ? list.slice(-6).reverse().map(function(x) { return '<div class="score-row"><span>' + esc(x.title) + '</span><b>' + String.fromCharCode(65 + state.scenarios[x.id]) + '</b></div>'; }).join("") : '<p class="dev-muted">Play a scenario and your choices show up here.</p>') + '</section></div><p class="dev-fineprint">All progress stays in this browser unless you sign in to a local account.</p>';
   }
   var DAILY_TASKS = [
@@ -246,12 +265,12 @@
     { view: "sort", icon: "🧮", name: "DSA", tag: "DATA STRUCTURES & ALGORITHMS", desc: "Step through classic algorithms with the real code beside the animation.", status: function() { return state.sortLab.bubble.done ? "Bubble Sort · Completed ✓" : "Bubble Sort · +40 XP"; } }
   ];
   function animatedPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Animated 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Play Lab 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
       '<div class="lab-module-grid">' + ANIMATED.map(function(c) { return moduleCard(c.view, c.icon, c.name, c.tag, c.desc, c.status()); }).join("") + '</div>' +
       '<section class="lab-footer-tip"><span>💡</span><p><b>More topics are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
   }
   function sortPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>DSA 🧮 <small>Bubble Sort</small></h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="' + sortBack + '">← ' + (sortBack === "map" ? "Game map" : "Animated") + '</button></section><div id="bubble-sort-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>DSA 🧮 <small>Bubble Sort</small></h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="anim">← Play Lab</button></section><div id="bubble-sort-host"></div>';
   }
   function mountSortLab() {
     var host = document.getElementById("bubble-sort-host");
@@ -296,6 +315,7 @@
     return [
       { icon: '🪄', title: 'First Spark', desc: 'Finish your first scenario.', unlocked: Object.keys(state.scenarios).length > 0 },
       { icon: '🌈', title: 'Well-Rounded', desc: 'Earn XP in all six skills.', unlocked: SKILLS.every(function(k) { return state.skills[k.id] > 0; }) },
+      { icon: '💻', title: 'Tech Starter', desc: 'Clear your first technical challenge.', unlocked: CHAL.some(function(x) { return techDone(x.id); }) },
       { icon: '🌱', title: 'Rising Skill', desc: 'Reach Level 2 in any skill.', unlocked: anySkill },
       { icon: '📼', title: 'Pocket Professor', desc: 'Collect all three Knowledge Reels.', unlocked: state.reels.length >= REELS.length },
       { icon: '🎭', title: 'Calm in the Chaos', desc: 'Finish the workplace simulator.', unlocked: state.simulator.done },
@@ -345,12 +365,72 @@
       '<details class="sk-others"><summary>See what the other approaches build</summary><ul>' + sc.options.map(function(x, i) { return '<li><b>' + String.fromCharCode(65 + i) + '</b><span>' + esc(x.text) + (i === r.choice ? ' <em>(your choice)</em>' : '') + '</span><span class="sk-gains">' + gainChips(x.xp) + '</span></li>'; }).join("") + '</ul></details>' +
       '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue">Next scenario →</button><button type="button" class="secondary-button" data-action="replay">Try a different approach</button><button type="button" class="secondary-button" data-nav="map">Back to Skills</button></div></div>';
   }
+  function codeBlock(lines) { return '<pre class="sk-code"><code>' + esc(lines.join("\n")) + '</code></pre>'; }
+  function techBody(c) {
+    if (c.kind === "tapLine") {
+      return '<p class="sk-hint">Tap every line that has a problem.</p><div class="sk-codelines">' + c.code.map(function(line, i) {
+        var on = has(session.lines, i);
+        return '<button type="button" class="sk-codeline ' + (on ? "picked" : "") + '" data-line="' + i + '" aria-pressed="' + on + '"><span>' + (i + 1) + '</span><code>' + esc(line) + '</code></button>';
+      }).join("") + '</div>';
+    }
+    if (c.kind === "arrange") {
+      var slots = c.items.map(function(_, i) {
+        var it = session.order[i];
+        return it === undefined ? '<span class="sk-slot"><b>' + (i + 1) + '</b></span>' : '<button type="button" class="sk-slot filled" data-unpick="' + i + '" aria-label="Remove ' + esc(c.items[it]) + '"><b>' + (i + 1) + '</b>' + esc(c.items[it]) + '</button>';
+      }).join("");
+      var tiles = c.items.map(function(t, i) { return has(session.order, i) ? "" : '<button type="button" class="sk-tile" data-pick="' + i + '">' + esc(t) + '</button>'; }).join("");
+      return (c.code ? codeBlock(c.code) : "") + '<p class="sk-hint">Tap the pieces in order. Tap a placed piece to take it back.</p><div class="sk-slots">' + slots + '</div><div class="sk-tiles">' + (tiles || '<span class="sk-hint">All placed. Lock it in when you are ready.</span>') + '</div>';
+    }
+    return (c.code ? codeBlock(c.code) : "") + '<div class="sk-options" role="radiogroup" aria-label="Answers">' + c.options.map(function(o, i) {
+      var on = session.choice === i;
+      return '<button type="button" class="sk-option ' + (on ? "picked" : "") + '" role="radio" aria-checked="' + on + '" data-choice="' + i + '"><span class="sk-letter">' + String.fromCharCode(65 + i) + '</span><span>' + esc(o) + '</span></button>';
+    }).join("") + '</div>';
+  }
+  function techReady(c) { return c.kind === "choice" ? session.choice !== null : (c.kind === "tapLine" ? session.lines.length > 0 : session.order.length === c.items.length); }
+  function techAnswerText(c) {
+    if (c.kind === "choice") return c.options[c.answer];
+    if (c.kind === "arrange") return c.answer.map(function(i) { return c.items[i]; }).join(" → ");
+    return "line" + (c.bad.length > 1 ? "s " : " ") + c.bad.map(function(i) { return i + 1; }).join(" and ");
+  }
+  function techResult(c) {
+    var r = session.result, head = r.score === 100 ? ["NAILED IT", "🎉"] : (r.score >= 60 ? ["NICE WORK", "✨"] : ["KEEP GOING", "🧩"]);
+    return '<div class="sk-result"><span class="sk-eyebrow">' + head[0] + ' ' + head[1] + '</span><h2 class="sk-score">' + r.score + '%</h2>' +
+      '<p class="sk-chosen"><b>Answer:</b> ' + esc(techAnswerText(c)) + '</p><div class="sk-insight"><span class="sk-eyebrow">WHY</span><p>' + esc(c.explain) + '</p></div>' +
+      '<div class="sk-gains">' + (r.gain > 0 ? '<span class="sk-chip">+' + r.gain + ' ' + esc(SKILL_BY_ID[c.skill].name) + '</span>' : '<span class="sk-chip sk-chip-muted">' + (r.score >= r.best ? "No new XP · best score " + r.best + "%" : "Best score stays " + r.best + "%") + '</span>') + '</div>' +
+      (r.levelUps.length ? '<ul class="sk-levelups">' + r.levelUps.map(function(t) { return '<li>🎉 ' + esc(t) + '</li>'; }).join("") + '</ul>' : "") +
+      '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue-tech">Next challenge →</button><button type="button" class="secondary-button" data-action="replay">Try again</button><button type="button" class="secondary-button" data-nav="map">Back to Skills</button></div></div>';
+  }
+  function techScreen(c) {
+    root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Skills</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · CHALLENGE</span><h1>' + c.emoji + ' ' + esc(c.title) + '</h1><p class="sk-situation">' + esc(c.prompt) + '</p>' +
+      (session.result ? techResult(c) : techBody(c) + '<div class="sk-actions"><button type="button" class="primary-button" data-action="submit"' + (techReady(c) ? "" : " disabled") + '>Lock it in →</button>' + (c.kind === "arrange" && session.order.length ? '<button type="button" class="secondary-button" data-action="clear-order">Clear</button>' : "") + '</div>') + '</section></div>';
+  }
+  function techSubmit(c) {
+    if (!techReady(c)) { say("Finish your answer first."); return; }
+    var score = 0;
+    if (c.kind === "choice") score = session.choice === c.answer ? 100 : 0;
+    else if (c.kind === "tapLine") { var hits = session.lines.filter(function(n) { return has(c.bad, n); }).length; score = Math.max(0, Math.round(hits / c.bad.length * 100 - (session.lines.length - hits) * 25)); }
+    else score = Math.round(c.answer.filter(function(v, i) { return session.order[i] === v; }).length / c.answer.length * 100);
+    var old = techBest(c.id), best = Math.max(old, score), gain = Math.round(c.xp * best / 100) - Math.round(c.xp * old / 100), levelUps = [];
+    if (gain > 0) {
+      var before = levelInfo(state.skills[c.skill], SKILL_AT).n, playerBefore = playerLevel().n;
+      state.skills[c.skill] += gain; state.xp += gain;
+      if (levelInfo(state.skills[c.skill], SKILL_AT).n > before) levelUps.push(SKILL_BY_ID[c.skill].name + " reached Level " + levelInfo(state.skills[c.skill], SKILL_AT).n);
+      if (playerLevel().n > playerBefore) levelUps.push("You reached Player Level " + playerLevel().n + " — " + playerLevel().name);
+    }
+    state.tech[c.id] = best; trackDaily("mission");
+    session.result = { score: score, best: best, gain: gain, levelUps: levelUps };
+    save();
+    if (state.sound && score >= 60) beep();
+    draw();
+  }
   function gameScreen() {
+    if (CHAL_BY_ID[current]) { techScreen(CHAL_BY_ID[current]); return; }
     var sc = SCEN_BY_ID[current];
     if (!sc) { go("map"); return; }
     root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Skills</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[sc.skill].name.toUpperCase()) + ' · SCENARIO</span><h1>' + esc(sc.title) + '</h1><p class="sk-situation">' + esc(sc.situation) + '</p><h2 class="sk-question">' + esc(sc.question) + '</h2>' + (session.result ? resultCard(sc) : choiceCard(sc)) + '</section></div>';
   }
   function submit() {
+    if (CHAL_BY_ID[current]) { techSubmit(CHAL_BY_ID[current]); return; }
     var sc = SCEN_BY_ID[current];
     if (!sc || session.choice === null) { say("Choose an approach first."); return; }
     var o = sc.options[session.choice], first = !played(sc.id), gains = {}, levelUps = [];
@@ -391,6 +471,8 @@
     if (reelPick) { reelAnswer = Number(reelPick.dataset.reelAnswer); reelFeedback = ""; draw(); return; }
     var simPick = e.target.closest("[data-sim-choice]");
     if (simPick) { chooseSim(Number(simPick.dataset.simChoice)); return; }
+    var techButton = e.target.closest("[data-tech]");
+    if (techButton) { open(nextChallenge(techButton.dataset.tech)); return; }
     var skillButton = e.target.closest("[data-skill]");
     if (skillButton) { open(nextScenario(skillButton.dataset.skill)); return; }
     var actionButton = e.target.closest("[data-action]"), action = actionButton && actionButton.dataset.action;
@@ -411,7 +493,15 @@
     }
     else if (action === "sim-restart") { state.simulator = { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 }; save(); draw(); }
     else if (action === "core") { track = "core"; go("map"); }
-    else if (action === "dsa") { track = "dsa"; go("map"); }
+    else if (action === "tech") { track = "tech"; go("map"); }
+    else if (action === "continue-tech") open(nextChallenge(CHAL_BY_ID[current] ? CHAL_BY_ID[current].skill : null));
+    else if (action === "clear-order") { session.order = []; draw(); }
+    var codeLine = e.target.closest("[data-line]");
+    if (codeLine && !session.result) { var ln = Number(codeLine.dataset.line); session.lines = has(session.lines, ln) ? session.lines.filter(function(x) { return x !== ln; }) : session.lines.concat([ln]); draw(); return; }
+    var pickTile = e.target.closest("[data-pick]");
+    if (pickTile && !session.result) { session.order = session.order.concat([Number(pickTile.dataset.pick)]); draw(); return; }
+    var unpick = e.target.closest("[data-unpick]");
+    if (unpick && !session.result) { session.order = session.order.slice(0, Number(unpick.dataset.unpick)); draw(); return; }
     var choice = e.target.closest("[data-choice]");
     if (choice && !session.result) { session.choice = Number(choice.dataset.choice); draw(); return; }
   });
