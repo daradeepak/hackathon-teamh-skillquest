@@ -161,7 +161,7 @@
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
     else if (view === "anim") { label.textContent = "Animated"; animatedPage(); }
-    else if (view === "sort") { label.textContent = "Animated · Bubble Sort"; sortPage(); }
+    else if (view === "sort") { label.textContent = "Animated · DSA"; sortPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
@@ -245,20 +245,15 @@
       '</div><section class="lab-footer-tip"><span>💡</span><p><b>Little and often wins.</b> These side quests are short on purpose. Come back tomorrow for a fresh daily checklist.</p></section>';
   }
   var ANIMATED = [
-    { id: "dsa", name: "DSA", icon: "🧮", blurb: "Data structures and algorithms, one step at a time.", items: [
-      { view: "sort", icon: "🫧", title: "Bubble Sort", tag: "SORTING · O(n²)", desc: "Watch neighbours compare and swap while the real code lights up beside them.", status: function() { return state.sortLab.bubble.done ? "Completed ✓" : "Start · +40 XP"; } }
-    ] }
+    { view: "sort", icon: "🧮", name: "DSA", tag: "DATA STRUCTURES & ALGORITHMS", desc: "Step through classic algorithms with the real code beside the animation.", status: function() { return state.sortLab.bubble.done ? "Bubble Sort · Completed ✓" : "Bubble Sort · +40 XP"; } }
   ];
   function animatedPage() {
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Animated 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
-      ANIMATED.map(function(cat) {
-        return '<section class="anim-category" aria-labelledby="anim-' + cat.id + '"><div class="dev-section-head"><div><span class="dev-eyebrow">' + cat.icon + ' ' + esc(cat.blurb) + '</span><h2 id="anim-' + cat.id + '">' + esc(cat.name) + '</h2></div></div><div class="lab-module-grid">' +
-          cat.items.map(function(item) { return moduleCard(item.view, item.icon, item.title, item.tag, item.desc, item.status()); }).join("") + '</div></section>';
-      }).join("") +
-      '<section class="lab-footer-tip"><span>💡</span><p><b>More algorithms are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
+      '<div class="lab-module-grid">' + ANIMATED.map(function(c) { return moduleCard(c.view, c.icon, c.name, c.tag, c.desc, c.status()); }).join("") + '</div>' +
+      '<section class="lab-footer-tip"><span>💡</span><p><b>More topics are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
   }
   function sortPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Bubble Sort Lab 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section><div id="bubble-sort-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>DSA 🧮 <small>Bubble Sort</small></h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section><div id="bubble-sort-host"></div>';
   }
   function mountSortLab() {
     var host = document.getElementById("bubble-sort-host");

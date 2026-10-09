@@ -25,6 +25,11 @@
           "claimed": false
         },
         "reels": [],
+        "sortLab": {
+          "bubble": {
+            "done": false
+          }
+        },
         "simulator": {
           "stage": 0,
           "score": 0,
