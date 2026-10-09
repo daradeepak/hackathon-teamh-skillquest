@@ -71,7 +71,7 @@
 .bs-input[aria-invalid="true"] { border-color: #d6453d; }
 .bs-select:focus-visible, .bs-input:focus-visible, .bs-seek:focus-visible { outline: 3px solid #a79aff; outline-offset: 2px; }
 .bs-error { min-height: 16px; margin: 0; color: #b3261e; font-size: 12px; font-weight: 600; text-align: center; }
-.bs-hint { margin: 0; color: var(--muted, #77858a); font-size: 11px; text-align: center; }
+.bs-hint { margin: 0; color: var(--muted, #5d6b70); font-size: 12px; text-align: center; }
 .bs-reward { margin: 0; display: none; padding: 10px 14px; border-radius: 12px; background: var(--mint, #d8f1e6); color: var(--mint-ink, #28694f); font-size: 12px; font-weight: 700; text-align: center; }
 .bs-reward.bs-reward-on { display: block; }
 
