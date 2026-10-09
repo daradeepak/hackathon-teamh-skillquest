@@ -120,17 +120,16 @@ A health check at `GET /api/health` reports whether the database is reachable. T
 
 ## 6. Team
 
-| Member | Contributions |
+| Member | Role |
 |---|---|
-| Tarun (tarun-apty) | Core app: Soft and Technical Skills engines, interactive lessons, PostgreSQL accounts and progress, security hardening, tests and CI, settings; reviewed and merged pull requests |
-| Vivek (VivekMethuku-PI) | Mini games arcade, achievements, dynamic Bubble Sort lab |
-| Deepak Dara (daradeepak) | Repository owner; first version of the app |
-| Sonali (Sonali-b23) | Combined the team's versions, repository clean-up, README, polish and QA |
-| Prem | *To be filled in by the team* |
-| Lalitha Akhila | *To be filled in by the team* |
+| Tarun (tarun-apty) | App development: Soft and Technical Skills engines, interactive lessons, PostgreSQL accounts and progress, security, tests and CI, settings; reviewed and merged pull requests |
+| Sonali (Sonali-b23) | App development: combined the team's versions, repository clean-up, README, polish and QA |
+| Deepak Dara (daradeepak) | App development: repository owner and first version of the app |
+| Vivek (VivekMethuku-PI) | App development: mini games arcade, achievements, dynamic Bubble Sort lab |
+| Prem | UI layout of the application and ideas |
+| Lalitha Akhila | The idea, improving the user experience, and the product name |
+| Subhrakeshi Pati | The idea, improving the user experience, and the product name |
 | Margarida | *To be filled in by the team* |
-
-Commits from the "Apty Admin" account (Reverse String and Binary Search visualisers, polish and QA fixes) belong to a team member; the team should name them here.
 
 ## 7. Credits and licences
 
