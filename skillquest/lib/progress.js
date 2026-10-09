@@ -25,7 +25,7 @@ const lessonIds = new Set(Object.keys(game.lessons || {}).concat(trailLessons.ma
 const scenarioXp = (game.scenarios || []).reduce((sum, item) => sum + Math.max(0, ...item.options.map(option => Object.values(option.xp).reduce((a, b) => a + b, 0))), 0);
 const challengeXp = (game.challenges || []).reduce((sum, item) => sum + item.xp, 0);
 /* AI Code Check: each game's XP, a chest bonus (25) per game and the most combo bonus a player can bank (10 + 20 + ...); JavaScript Trail: 20 per lesson */
-const aiXp = Object.values(aiGames).reduce((sum, game) => sum + (game.xp || 50), 0) + aiGameIds.size * 25 + 5 * aiGameIds.size * aiGameIds.size + trailLessons.length * 20 + 3 * 85 + 30; /* + Merge Defender: up to 3 stars (20 each) and a 25 XP chest for each of 3 waves; + Bug Radar baseline */
+const aiXp = Object.values(aiGames).reduce((sum, game) => sum + (game.xp || 50), 0) + aiGameIds.size * 25 + 5 * aiGameIds.size * aiGameIds.size + trailLessons.length * 20 + 3 * 85; /* + Merge Defender: up to 3 stars (20 each) and a 25 XP chest for each of 3 waves */
 /* every scenario, challenge and lesson, both algorithm labs, AI Code Check, plus an allowance for the daily quest, reels and story */
 const MAX_XP = scenarioXp + challengeXp + lessonIds.size * 10 + aiXp + 80 + 400;
 
@@ -48,7 +48,6 @@ function sanitizeProgress(input) {
   const ids = (list, valid) => Array.isArray(list) ? [...new Set(list.filter(id => typeof id === "string" && valid(id)))] : [];
   const ai = p.aicheck && typeof p.aicheck === "object" && !Array.isArray(p.aicheck) ? p.aicheck : {};
   const aicheck = { played: ids(ai.played, id => aiGameIds.has(id)), bosses: ids(ai.bosses, id => aiGameIds.has(id)), chests: ids(ai.chests, id => aiGameIds.has(id)), best: {}, rematchAt: {}, combo: clampInt(ai.combo, 1000), bestCombo: clampInt(ai.bestCombo, 1000), waves: {} };
-  aicheck.radar = (Array.isArray(ai.radar) ? ai.radar : []).slice(0, 10).filter(r => r && typeof r === "object").map(r => ({ at: clampInt(r.at, 1e13), c: clampInt(r.c, 5), t: clampInt(r.t, 200) }));
   if (ai.waves && typeof ai.waves === "object") [1, 2, 3].forEach(n => { const v = clampInt(ai.waves[n], 3); if (v) aicheck.waves[n] = v; });
   if (ai.best && typeof ai.best === "object") Object.keys(ai.best).forEach(id => { if (aiGameIds.has(id)) aicheck.best[id] = clampInt(ai.best[id], 100); });
   if (ai.rematchAt && typeof ai.rematchAt === "object") Object.keys(ai.rematchAt).forEach(id => { const v = Number(ai.rematchAt[id]); if (aiGameIds.has(id) && Number.isFinite(v) && v > 0) aicheck.rematchAt[id] = Math.floor(v); });

@@ -21,8 +21,6 @@ npm test               # API, security and content tests (needs a test database)
 | `developer-js-lessons.js` | The 12-lesson JavaScript learn trail (also the animated JavaScript Trail) |
 | `aicheck-app.js` | AI Code Check games, JavaScript Trail and Pip's explainers; plugs into `developer-app.js` |
 | `aicheck-games.js`, `developer-visuals.js` | AI Code Check content and Pip's animated explainers |
-| `aicheck-pools.js` | Extra versions of each AI Code Check game, tagged easy/medium/hard (used by waves, practice and Bug Radar) |
-| `defender.css` | Merge Defender, Bug Radar and game-feel effects |
 | `bubble-sort.js` / `.css`, `binary-search.js` / `.css` | The two DSA labs under Play Lab |
 | `runner-worker.js` | Runs learner JavaScript (Technical Skills and the AI Code Check Code Fix boss) against tests in a Web Worker (no network access) |
 | `theme-init.js` | Applies the saved light/dark theme before first paint |

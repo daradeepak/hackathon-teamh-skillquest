@@ -23,9 +23,6 @@
 | Interactive lessons | 24 lessons: compare-and-explore, step-through code with state, and storyboard flows. +10 XP once each. |
 | Interactive challenges | 12 challenges in six formats: live CSS editor with preview and goal checklist, JavaScript editor that runs tests, type-in blanks, match pairs, put in order, tap the buggy lines. Partial credit, and improving your best score earns the rest of the XP. |
 | AI Code Check | 14 games on six engines (choice, tap-the-line, multi-select, Spec Check, PR review, code fix), 3 bosses, combos, chests and rematches. |
-| Merge Defender | AI Code Check as a story: BugBot sends 5 pull requests per wave. 3 production lives, instant retry, stars and a wave chest. Difficulty adapts: two blocks in a row bring a harder PR, a miss brings an easier one. |
-| Question pools | Each core game has 3–4 versions (easy, medium, hard), so waves and replays show new code. A miss offers "Try a similar one". |
-| Bug Radar | A 2-minute, 5-question timed check of reading AI code. The Progress page compares day 1 with now (bugs caught and seconds per question): measurable progress, not just XP. |
 | Play Lab | JavaScript Trail (12 animated lessons, unlock in order, +20 XP each), Pip's Code Explainers (14 animated concepts) and DSA labs: **Bubble Sort** (3D, custom arrays) and **Binary Search** (lo/mid/hi markers, choose your target). Each earns XP and a badge once. |
 | Leaderboard | Registered players ranked by XP, with photos, your row highlighted. |
 | Profile | Click your avatar to change your name and upload a photo (resized in the browser). |
