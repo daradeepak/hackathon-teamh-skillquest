@@ -18,7 +18,7 @@
     { speaker: "Pip 🦊 · Client call", text: "A client is upset about a missed deadline and starts raising their voice. What happens first?", options: ["Stay calm, acknowledge their frustration, and say what you’ll do next.", "Explain all the reasons it wasn’t your fault.", "End the call until they calm down."], points: [2, 1, 0], feedback: ["Yes. Acknowledging feelings first lowers the temperature, and a clear next step rebuilds trust.", "Explanations can sound like excuses before the person feels heard.", "Ending the call can make a bad moment worse. Stay steady and keep it constructive."] }
   ];
   function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) } }; }
-  function fresh() { return { choice: null, lines: [], order: [], result: null }; }
+  function fresh() { return { choice: null, lines: [], order: [], pairs: {}, pending: null, fill: [], code: "", busy: false, result: null }; }
   function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
   function blankProgress(name) {
     return { name: name || "Learner", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, daily: { date: dayKey(), actions: [], claimed: false },
@@ -366,6 +366,73 @@
       '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue">Next scenario →</button><button type="button" class="secondary-button" data-action="replay">Try a different approach</button><button type="button" class="secondary-button" data-nav="map">Back to Skills</button></div></div>';
   }
   function codeBlock(lines) { return '<pre class="sk-code"><code>' + esc(lines.join("\n")) + '</code></pre>'; }
+  function normAnswer(x) { return String(x == null ? "" : x).trim().replace(/\s+/g, " ").toLowerCase(); }
+  function blankCount(c) { return c.blanks.length; }
+
+  /* ---- live CSS checks: they read the sandboxed preview document ---- */
+  var LIVE_CHECKS = {
+    center: function(doc) {
+      var a = doc.querySelector(".container").getBoundingClientRect(), b = doc.querySelector(".box").getBoundingClientRect();
+      return [{ label: "Box is centred horizontally", ok: Math.abs((a.left + a.width / 2) - (b.left + b.width / 2)) <= 1.5 }, { label: "Box is centred vertically", ok: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) <= 1.5 }];
+    },
+    "row-gap": function(doc) {
+      var r = [].map.call(doc.querySelectorAll(".card"), function(el) { return el.getBoundingClientRect(); });
+      var row = r.length === 3 && r.every(function(x) { return Math.abs(x.top - r[0].top) <= 1; }) && r[1].left > r[0].left && r[2].left > r[1].left;
+      var gap = row && Math.abs(r[1].left - r[0].right - 16) <= 1 && Math.abs(r[2].left - r[1].right - 16) <= 1;
+      return [{ label: "Cards sit side by side", ok: !!row }, { label: "16px gap between the cards", ok: !!gap }];
+    }
+  };
+  function liveDoc(c, css) {
+    return '<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:12px;font-family:sans-serif}' + c.base + '</style><style>' + String(css).replace(/<\/style/gi, "<\\/style") + '</style>' + c.html;
+  }
+  function liveResults(c, frame) { try { return LIVE_CHECKS[c.check](frame.contentDocument); } catch (e) { return []; } }
+  function renderGoals(c, results) {
+    var box = root.querySelector(".sk-goals"); if (!box) return;
+    box.innerHTML = results.map(function(g) { return '<li class="' + (g.ok ? "ok" : "") + '">' + (g.ok ? "✓" : "○") + ' ' + esc(g.label) + '</li>'; }).join("");
+  }
+  function setupLive(c) {
+    var frame = root.querySelector(".sk-preview"), area = root.querySelector(".sk-editor"), pending = null;
+    if (!frame || !area) return;
+    function refresh() { frame.srcdoc = liveDoc(c, area.value); }
+    frame.addEventListener("load", function() { session.live = liveResults(c, frame); renderGoals(c, session.live); });
+    area.addEventListener("input", function() { session.code = area.value; clearTimeout(pending); pending = setTimeout(refresh, 250); });
+    refresh();
+  }
+  /* waits for the preview to settle, then reads the checks */
+  function evalLive(c) {
+    return new Promise(function(resolve) {
+      var frame = root.querySelector(".sk-preview"), area = root.querySelector(".sk-editor");
+      if (!frame || !area) { resolve([]); return; }
+      var done = false, timer = setTimeout(function() { finish(); }, 1500);
+      function finish() { if (done) return; done = true; clearTimeout(timer); resolve(liveResults(c, frame)); }
+      frame.addEventListener("load", finish, { once: true });
+      frame.srcdoc = liveDoc(c, area.value);
+    });
+  }
+
+  /* ---- JavaScript tests run in a Web Worker with a time limit ---- */
+  function runTests(c, code) {
+    return new Promise(function(resolve) {
+      var src = "self.onmessage=function(e){var d=e.data;try{var fn=new Function(d.code+'\\n;return '+d.name+';')();if(typeof fn!=='function')throw new Error('Define a function named '+d.name);var rows=d.tests.map(function(t){try{var a=fn.apply(null,t.args);return{actual:a===undefined?'undefined':a,pass:JSON.stringify(a)===JSON.stringify(t.expected)}}catch(x){return{actual:String(x.message),pass:false}}});self.postMessage({rows:rows})}catch(x){self.postMessage({error:x.message})}};";
+      var url, worker, timeout;
+      function end(result) { clearTimeout(timeout); if (worker) worker.terminate(); if (url) URL.revokeObjectURL(url); resolve(result); }
+      try {
+        url = URL.createObjectURL(new Blob([src], { type: "text/javascript" })); worker = new Worker(url);
+        timeout = setTimeout(function() { end({ error: "That took too long. Check for an infinite loop." }); }, 1500);
+        worker.onmessage = function(e) {
+          if (e.data.error) { end({ error: e.data.error }); return; }
+          end({ rows: e.data.rows.map(function(r, i) { return { args: c.tests[i].args, expected: c.tests[i].expected, actual: r.actual, pass: r.pass }; }) });
+        };
+        worker.onerror = function() { end({ error: "Couldn’t run that code. Check the syntax." }); };
+        worker.postMessage({ code: code, name: c.fn, tests: c.tests });
+      } catch (e) { end({ error: "This browser couldn’t start the code runner." }); }
+    });
+  }
+  function testRows(c, out) {
+    if (out.error) return '<li class="bad">⚠ ' + esc(out.error) + '</li>';
+    return out.rows.map(function(r) { return '<li class="' + (r.pass ? "ok" : "bad") + '">' + (r.pass ? "✓" : "✕") + ' ' + esc(c.fn + "(" + c.tests[out.rows.indexOf(r)].args.map(function(a) { return JSON.stringify(a); }).join(", ") + ")") + ' → ' + esc(JSON.stringify(r.actual)) + (r.pass ? "" : " (expected " + esc(JSON.stringify(r.expected)) + ")") + '</li>'; }).join("");
+  }
+
   function techBody(c) {
     if (c.kind === "tapLine") {
       return '<p class="sk-hint">Tap every line that has a problem.</p><div class="sk-codelines">' + c.code.map(function(line, i) {
@@ -381,21 +448,56 @@
       var tiles = c.items.map(function(t, i) { return has(session.order, i) ? "" : '<button type="button" class="sk-tile" data-pick="' + i + '">' + esc(t) + '</button>'; }).join("");
       return (c.code ? codeBlock(c.code) : "") + '<p class="sk-hint">Tap the pieces in order. Tap a placed piece to take it back.</p><div class="sk-slots">' + slots + '</div><div class="sk-tiles">' + (tiles || '<span class="sk-hint">All placed. Lock it in when you are ready.</span>') + '</div>';
     }
-    return (c.code ? codeBlock(c.code) : "") + '<div class="sk-options" role="radiogroup" aria-label="Answers">' + c.options.map(function(o, i) {
-      var on = session.choice === i;
-      return '<button type="button" class="sk-option ' + (on ? "picked" : "") + '" role="radio" aria-checked="' + on + '" data-choice="' + i + '"><span class="sk-letter">' + String.fromCharCode(65 + i) + '</span><span>' + esc(o) + '</span></button>';
-    }).join("") + '</div>';
+    if (c.kind === "match") {
+      var paired = {}; Object.keys(session.pairs).forEach(function(l) { paired[session.pairs[l]] = Number(l); });
+      var left = c.pairs.map(function(p, i) {
+        var on = session.pairs[i] !== undefined, sel = session.pending === i;
+        return '<button type="button" class="sk-match ' + (on ? "paired " : "") + (sel ? "pending" : "") + '" data-ml="' + i + '"><b>' + (on ? i + 1 : "·") + '</b><code>' + esc(p[0]) + '</code></button>';
+      }).join("");
+      var right = c.rightOrder.map(function(ri) {
+        var l = paired[ri];
+        return '<button type="button" class="sk-match ' + (l !== undefined ? "paired" : "") + '" data-mr="' + ri + '"><b>' + (l !== undefined ? l + 1 : "·") + '</b><span>' + esc(c.pairs[ri][1]) + '</span></button>';
+      }).join("");
+      return '<p class="sk-hint">Tap a tag, then tap what it is for. Tap a pair to undo it.</p><div class="sk-matchgrid"><div>' + left + '</div><div>' + right + '</div></div>';
+    }
+    if (c.kind === "fill") {
+      var k = 0;
+      var hasBlanks = c.code.some(function(l) { return l.indexOf("___") >= 0; });
+      function input(n) { return '<input class="sk-blank" data-blank="' + n + '" value="' + esc(session.fill[n] || "") + '" size="9" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Blank ' + (n + 1) + '">'; }
+      if (hasBlanks) {
+        var rows = c.code.map(function(line) { return line.split("___").map(function(part, i, arr) { return esc(part) + (i < arr.length - 1 ? input(k++) : ""); }).join(""); });
+        return '<p class="sk-hint">Type the missing words in the boxes.</p><pre class="sk-code sk-fillcode"><code>' + rows.join("\n") + '</code></pre>';
+      }
+      return codeBlock(c.code) + '<label class="sk-ask">' + esc(c.ask || "Your answer:") + ' ' + input(0) + '</label>';
+    }
+    if (c.kind === "live") {
+      return '<p class="sk-hint">Edit the CSS. The preview updates as you type.</p><div class="sk-live"><div><textarea class="sk-editor" spellcheck="false" autocapitalize="off" aria-label="CSS editor">' + esc(session.code || c.starter) + '</textarea></div><div><iframe class="sk-preview" title="Live preview" sandbox="allow-same-origin"></iframe><ul class="sk-goals" aria-live="polite"></ul></div></div>';
+    }
+    if (c.kind === "run") {
+      return '<textarea class="sk-editor sk-editor-js" spellcheck="false" autocapitalize="off" aria-label="JavaScript editor">' + esc(session.code || c.starter) + '</textarea><div class="sk-actions"><button type="button" class="secondary-button" data-action="run-tests">▶ Run tests</button></div><ul class="sk-tests" aria-live="polite"></ul>';
+    }
+    return "";
   }
-  function techReady(c) { return c.kind === "choice" ? session.choice !== null : (c.kind === "tapLine" ? session.lines.length > 0 : session.order.length === c.items.length); }
+  function techReady(c) {
+    if (session.busy) return false;
+    if (c.kind === "tapLine") return session.lines.length > 0;
+    if (c.kind === "arrange") return session.order.length === c.items.length;
+    if (c.kind === "match") return Object.keys(session.pairs).length === c.pairs.length;
+    if (c.kind === "fill") { for (var i = 0; i < blankCount(c); i++) if (!normAnswer(session.fill[i])) return false; return true; }
+    return true;
+  }
   function techAnswerText(c) {
-    if (c.kind === "choice") return c.options[c.answer];
     if (c.kind === "arrange") return c.answer.map(function(i) { return c.items[i]; }).join(" → ");
-    return "line" + (c.bad.length > 1 ? "s " : " ") + c.bad.map(function(i) { return i + 1; }).join(" and ");
+    if (c.kind === "tapLine") return "line" + (c.bad.length > 1 ? "s " : " ") + c.bad.map(function(i) { return i + 1; }).join(" and ");
+    if (c.kind === "match") return c.pairs.map(function(p) { return p[0] + " = " + p[1]; }).join("; ");
+    if (c.kind === "fill") return c.blanks.map(function(b) { return b[0]; }).join(", ");
+    return "";
   }
   function techResult(c) {
-    var r = session.result, head = r.score === 100 ? ["NAILED IT", "🎉"] : (r.score >= 60 ? ["NICE WORK", "✨"] : ["KEEP GOING", "🧩"]);
-    return '<div class="sk-result"><span class="sk-eyebrow">' + head[0] + ' ' + head[1] + '</span><h2 class="sk-score">' + r.score + '%</h2>' +
-      '<p class="sk-chosen"><b>Answer:</b> ' + esc(techAnswerText(c)) + '</p><div class="sk-insight"><span class="sk-eyebrow">WHY</span><p>' + esc(c.explain) + '</p></div>' +
+    var r = session.result, head = r.score === 100 ? ["NAILED IT", "🎉"] : (r.score >= 60 ? ["NICE WORK", "✨"] : ["KEEP GOING", "🧩"]), ans = techAnswerText(c);
+    var detail = r.tests ? '<ul class="sk-tests">' + r.tests + '</ul>' : (r.goals ? '<ul class="sk-goals">' + r.goals.map(function(g) { return '<li class="' + (g.ok ? "ok" : "") + '">' + (g.ok ? "✓" : "○") + ' ' + esc(g.label) + '</li>'; }).join("") + '</ul>' : "");
+    return '<div class="sk-result"><span class="sk-eyebrow">' + head[0] + ' ' + head[1] + '</span><h2 class="sk-score">' + r.score + '%</h2>' + detail +
+      (ans ? '<p class="sk-chosen"><b>Answer:</b> ' + esc(ans) + '</p>' : "") + '<div class="sk-insight"><span class="sk-eyebrow">WHY</span><p>' + esc(c.explain) + '</p></div>' +
       '<div class="sk-gains">' + (r.gain > 0 ? '<span class="sk-chip">+' + r.gain + ' ' + esc(SKILL_BY_ID[c.skill].name) + '</span>' : '<span class="sk-chip sk-chip-muted">' + (r.score >= r.best ? "No new XP · best score " + r.best + "%" : "Best score stays " + r.best + "%") + '</span>') + '</div>' +
       (r.levelUps.length ? '<ul class="sk-levelups">' + r.levelUps.map(function(t) { return '<li>🎉 ' + esc(t) + '</li>'; }).join("") + '</ul>' : "") +
       '<div class="sk-actions"><button type="button" class="primary-button" data-action="continue-tech">Next challenge →</button><button type="button" class="secondary-button" data-action="replay">Try again</button><button type="button" class="secondary-button" data-nav="map">Back to Skills</button></div></div>';
@@ -403,25 +505,38 @@
   function techScreen(c) {
     root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Skills</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · CHALLENGE</span><h1>' + c.emoji + ' ' + esc(c.title) + '</h1><p class="sk-situation">' + esc(c.prompt) + '</p>' +
       (session.result ? techResult(c) : techBody(c) + '<div class="sk-actions"><button type="button" class="primary-button" data-action="submit"' + (techReady(c) ? "" : " disabled") + '>Lock it in →</button>' + (c.kind === "arrange" && session.order.length ? '<button type="button" class="secondary-button" data-action="clear-order">Clear</button>' : "") + '</div>') + '</section></div>';
+    if (c.kind === "live" && !session.result) setupLive(c);
+  }
+  function techScore(c) {
+    if (c.kind === "tapLine") { var hits = session.lines.filter(function(n) { return has(c.bad, n); }).length; return { score: Math.max(0, Math.round(hits / c.bad.length * 100 - (session.lines.length - hits) * 25)) }; }
+    if (c.kind === "arrange") return { score: Math.round(c.answer.filter(function(v, i) { return session.order[i] === v; }).length / c.answer.length * 100) };
+    if (c.kind === "match") return { score: Math.round(c.pairs.filter(function(_, i) { return session.pairs[i] === i; }).length / c.pairs.length * 100) };
+    if (c.kind === "fill") return { score: Math.round(c.blanks.filter(function(b, i) { return b.some(function(a) { return normAnswer(a) === normAnswer(session.fill[i]); }); }).length / c.blanks.length * 100) };
+    if (c.kind === "live") return evalLive(c).then(function(goals) { return { score: goals.length ? Math.round(goals.filter(function(g) { return g.ok; }).length / goals.length * 100) : 0, goals: goals }; });
+    var area = root.querySelector(".sk-editor"); if (area) session.code = area.value;
+    return runTests(c, session.code || c.starter).then(function(out) {
+      return { score: out.error ? 0 : Math.round(out.rows.filter(function(r) { return r.pass; }).length / out.rows.length * 100), tests: testRows(c, out) };
+    });
   }
   function techSubmit(c) {
     if (!techReady(c)) { say("Finish your answer first."); return; }
-    var score = 0;
-    if (c.kind === "choice") score = session.choice === c.answer ? 100 : 0;
-    else if (c.kind === "tapLine") { var hits = session.lines.filter(function(n) { return has(c.bad, n); }).length; score = Math.max(0, Math.round(hits / c.bad.length * 100 - (session.lines.length - hits) * 25)); }
-    else score = Math.round(c.answer.filter(function(v, i) { return session.order[i] === v; }).length / c.answer.length * 100);
-    var old = techBest(c.id), best = Math.max(old, score), gain = Math.round(c.xp * best / 100) - Math.round(c.xp * old / 100), levelUps = [];
-    if (gain > 0) {
-      var before = levelInfo(state.skills[c.skill], SKILL_AT).n, playerBefore = playerLevel().n;
-      state.skills[c.skill] += gain; state.xp += gain;
-      if (levelInfo(state.skills[c.skill], SKILL_AT).n > before) levelUps.push(SKILL_BY_ID[c.skill].name + " reached Level " + levelInfo(state.skills[c.skill], SKILL_AT).n);
-      if (playerLevel().n > playerBefore) levelUps.push("You reached Player Level " + playerLevel().n + " — " + playerLevel().name);
-    }
-    state.tech[c.id] = best; trackDaily("mission");
-    session.result = { score: score, best: best, gain: gain, levelUps: levelUps };
-    save();
-    if (state.sound && score >= 60) beep();
-    draw();
+    session.busy = true;
+    var button = root.querySelector("[data-action='submit']"); if (button) { button.disabled = true; button.textContent = "Checking…"; }
+    Promise.resolve(techScore(c)).then(function(res) {
+      session.busy = false;
+      var score = res.score, old = techBest(c.id), best = Math.max(old, score), gain = Math.round(c.xp * best / 100) - Math.round(c.xp * old / 100), levelUps = [];
+      if (gain > 0) {
+        var before = levelInfo(state.skills[c.skill], SKILL_AT).n, playerBefore = playerLevel().n;
+        state.skills[c.skill] += gain; state.xp += gain;
+        if (levelInfo(state.skills[c.skill], SKILL_AT).n > before) levelUps.push(SKILL_BY_ID[c.skill].name + " reached Level " + levelInfo(state.skills[c.skill], SKILL_AT).n);
+        if (playerLevel().n > playerBefore) levelUps.push("You reached Player Level " + playerLevel().n + " — " + playerLevel().name);
+      }
+      state.tech[c.id] = best; trackDaily("mission");
+      session.result = { score: score, best: best, gain: gain, levelUps: levelUps, tests: res.tests, goals: res.goals };
+      save();
+      if (state.sound && score >= 60) beep();
+      draw();
+    });
   }
   function gameScreen() {
     if (CHAL_BY_ID[current]) { techScreen(CHAL_BY_ID[current]); return; }
@@ -496,6 +611,19 @@
     else if (action === "tech") { track = "tech"; go("map"); }
     else if (action === "continue-tech") open(nextChallenge(CHAL_BY_ID[current] ? CHAL_BY_ID[current].skill : null));
     else if (action === "clear-order") { session.order = []; draw(); }
+    else if (action === "run-tests") {
+      var cc = CHAL_BY_ID[current], ed = root.querySelector(".sk-editor"), list = root.querySelector(".sk-tests");
+      if (cc && ed && list) { session.code = ed.value; list.innerHTML = "<li>Running…</li>"; runTests(cc, ed.value).then(function(out) { list.innerHTML = testRows(cc, out); }); }
+    }
+    var matchLeft = e.target.closest("[data-ml]");
+    if (matchLeft && !session.result) { var li = Number(matchLeft.dataset.ml); if (session.pairs[li] !== undefined) delete session.pairs[li]; session.pending = session.pending === li ? null : li; draw(); return; }
+    var matchRight = e.target.closest("[data-mr]");
+    if (matchRight && !session.result) {
+      var ri = Number(matchRight.dataset.mr), owner = Object.keys(session.pairs).find(function(l) { return session.pairs[l] === ri; });
+      if (session.pending !== null) { if (owner !== undefined) delete session.pairs[owner]; session.pairs[session.pending] = ri; session.pending = null; }
+      else if (owner !== undefined) delete session.pairs[owner];
+      draw(); return;
+    }
     var codeLine = e.target.closest("[data-line]");
     if (codeLine && !session.result) { var ln = Number(codeLine.dataset.line); session.lines = has(session.lines, ln) ? session.lines.filter(function(x) { return x !== ln; }) : session.lines.concat([ln]); draw(); return; }
     var pickTile = e.target.closest("[data-pick]");
@@ -504,6 +632,16 @@
     if (unpick && !session.result) { session.order = session.order.slice(0, Number(unpick.dataset.unpick)); draw(); return; }
     var choice = e.target.closest("[data-choice]");
     if (choice && !session.result) { session.choice = Number(choice.dataset.choice); draw(); return; }
+  });
+  document.addEventListener("input", function(e) {
+    if (e.target.classList && e.target.classList.contains("sk-blank")) {
+      session.fill[Number(e.target.dataset.blank)] = e.target.value;
+      var c = CHAL_BY_ID[current], submitButton = root.querySelector("[data-action='submit']");
+      if (c && submitButton) submitButton.disabled = !techReady(c);
+    }
+  });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && e.target.classList && e.target.classList.contains("sk-blank")) { var c = CHAL_BY_ID[current]; if (c && techReady(c)) techSubmit(c); }
   });
   document.addEventListener("submit", function(e) {
     if (e.target.id === "account-form") { e.preventDefault(); submitAccount(e.target); }
