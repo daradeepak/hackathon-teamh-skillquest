@@ -1,15 +1,18 @@
 # XPedition
 
-**Build soft skills and technical skills by playing.** Players sign in and then practise through short, interactive challenges: workplace scenarios with no wrong answers, and hands-on HTML, CSS and JavaScript lessons you can see, touch and then prove you understood. Every action earns XP, levels up a skill, and moves you up the leaderboard.
+**Build soft skills and technical skills by playing.** Players sign in and then practise through short, interactive challenges: workplace scenarios with no wrong answers, hands-on HTML, CSS and JavaScript lessons you can see, touch and then prove you understood, quick mini games, and animated algorithm labs. Every action earns XP, levels up a skill, unlocks achievements and moves you up the leaderboard.
+
+Team H · Apty Hackathon 2026 · Theme: *Quality Education: upskilling, the non-traditional method*
 
 ## 1. Project overview
 
 **The problem.** Most upskilling is passive: slide decks, long videos, quizzes that reward memorising. Soft skills are even harder, because there is rarely one right answer, so they are skipped or taught as lectures. New hires end up with technical know-how but little practice at the moments that decide how they work with people.
 
-**The solution.** XPedition teaches by doing, in two tracks that share one XP system:
+**The solution.** XPedition teaches by doing. Two skill tracks share one XP system, with mini games and labs around them:
 
 - **Soft Skills** — 12 short workplace scenarios across six skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). There are no right or wrong answers. The approach you choose awards XP to the skills it shows, and a short note explains what that approach is good at and what to watch for.
-- **Technical Skills** — HTML, CSS and JavaScript. Each skill has a *learn, then play* path: a short interactive visual lesson (compare versions side by side, or step through code and watch its state), then a challenge. JavaScript also has a 12-lesson learn trail from your first line to async code.
+- **Technical Skills** — HTML, CSS and JavaScript, with 8 challenges each. Every challenge has a *learn, then play* path: a short interactive visual lesson (compare versions side by side, or step through code and watch its state), then the challenge. JavaScript also has a 12-lesson learn trail from your first line to async code.
+- **Mini games and Play Lab** — four fast arcade games (true/false, HTTP status pairs, Git step ordering, naming conventions) and three animated algorithm labs (Bubble Sort, Binary Search, Reverse a String).
 
 **What was built:** a complete playable app (vanilla JavaScript, no framework or build step), a Node server backed by PostgreSQL for accounts, sessions, profile, progress and the leaderboard, an automated test suite, and CI.
 
@@ -19,12 +22,15 @@
 |---|---|
 | Game Map | Skill cards with levels, XP and progress bars. A player level that grows with total XP. |
 | Soft-skill scenarios | 12 branching-choice scenarios. Each option awards XP to one to three skills. First choice counts, replays are practice. |
-| Interactive lessons | 24 lessons: compare-and-explore, step-through code with state, and storyboard flows. +10 XP once each. |
-| Interactive challenges | 12 challenges in six formats: live CSS editor with preview and goal checklist, JavaScript editor that runs tests, type-in blanks, match pairs, put in order, tap the buggy lines. Partial credit, and improving your best score earns the rest of the XP. |
-| Play Lab | DSA labs: **Bubble Sort** (3D, custom arrays) and **Binary Search** (lo/mid/hi markers, choose your target). Each earns XP and a badge once. |
+| Interactive lessons | 24 lessons (one before each challenge) plus the 12-lesson JavaScript learn trail: compare-and-explore, step-through code with state, and storyboard flows. +10 XP once each. |
+| Interactive challenges | 24 challenges (8 each for HTML, CSS and JavaScript) in six formats: live CSS editor with preview and goal checklist, JavaScript editor that runs tests, type-in blanks, match pairs, put in order, tap the buggy lines. Partial credit, and improving your best score earns the rest of the XP. |
+| Mini games | **Truth Rush** (true or false on a timer, with streaks), **Status Pair Hunt** (match HTTP status codes to their meanings; easy, medium or hard grid), **Git Line-up** (put Git, HTML and CSS steps in order, then ship), **Kebab Kanon** (pick the naming style that belongs in CSS, JS, JSON or Git). |
+| Play Lab | DSA labs: **Bubble Sort** (3D, custom arrays), **Binary Search** (lo/mid/hi markers, choose your target) and **Reverse a String** (two pointers swapping from both ends, with the code lit up). Each earns XP and a badge once. |
+| Daily tasks | A daily bar with three goals: complete a task, finish a lesson, clear a challenge. |
+| Achievements | 15 badges for milestones such as your first task, levelling up, a well-rounded skill set and finishing the algorithm labs. |
 | Leaderboard | Registered players ranked by XP, with photos, your row highlighted. |
-| Profile | Click your avatar to change your name and upload a photo (resized in the browser). |
-| Theme | Light and Dark mode, remembered between visits. |
+| Profile | Click your avatar to change your name, pick a default avatar or upload a photo (resized in the browser). |
+| Settings | Theme (light or dark), text size, reduce motion, sound effects, lesson autoplay speed, which Game Map tab opens first, and reset progress. |
 | Accounts | A themed login page opens first; nothing in the app works until you sign in. Passwords are scrypt-hashed, sessions are stored hashed in PostgreSQL. |
 | Progress | Your personal stats: player level, XP per skill and recent scenarios. |
 | Accessibility | Keyboard-friendly controls, labelled inputs and live regions, reduced-motion support. |
@@ -51,11 +57,13 @@ npm start                          # then open http://localhost:8000
 - **Windows:** double-click `skillquest/start-localhost.bat`. **macOS / Linux:** `./skillquest/start.sh`.
 - **Share on your network:** set `HOST=0.0.0.0`, then open `http://<your-ip>:8000` from another device.
 - **Moving old accounts:** `node scripts/import-json-accounts.js` copies users from the earlier `data/accounts.json` into PostgreSQL (existing emails are skipped).
-- **Tests:** `createdb -O xpedition xpedition_test`, then `npm test`. Set `TEST_DATABASE_URL` if your test database lives elsewhere. The test database is wiped on every run.
+- **Tests:** `createdb -O xpedition xpedition_test`, then `npm test`. Set `TEST_DATABASE_URL` if your test database lives elsewhere. The test database is wiped on every run. On Node 24, run `node --test test/*.test.js` instead (CI uses Node 20).
 
 ## 4. Deployment
 
-Run `node server.js` behind an HTTPS reverse proxy (nginx, Caddy, a cloud load balancer) with a managed PostgreSQL database. Configuration is by environment variable or a `.env` file:
+**Deployed URL:** not publicly deployed. The app runs locally with the steps in section 3 (Node.js and PostgreSQL); no external services or API keys are needed.
+
+To deploy it, run `node server.js` behind an HTTPS reverse proxy (nginx, Caddy, a cloud load balancer) with a managed PostgreSQL database. Configuration is by environment variable or a `.env` file:
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -74,6 +82,7 @@ A health check at `GET /api/health` reports whether the database is reachable. T
 - Rate limits are kept in memory, so with several server instances each one counts separately. Use a shared store (or the proxy's rate limiting) when you scale out.
 - XP is calculated in the browser. The server rejects impossible values (it caps XP at what the content can award), but a determined player could still claim up to the cap. A fully trusted leaderboard needs server-side scoring.
 - There is no password reset or email verification yet.
+- Mini-game best scores aren’t saved by the server yet, so they can be lost when you sign in again or switch devices.
 - Fonts load from Google Fonts; self-host them for a fully offline deployment.
 - Back up the database regularly (for example with `pg_dump`).
 
@@ -109,10 +118,10 @@ Vivek, Prem, Lalitha Akhila, Margarida, Sonali, Deepak Dara. *(Add each person's
 
 ## 8. Data and safety
 
-All scenarios and characters are fictional. No production data, credentials or API keys are in this repository. Passwords are hashed with scrypt and never returned by the API. Accounts live in PostgreSQL. `.env` (database credentials) and the old `skillquest/data/accounts.json` are git-ignored; never commit them.
+All scenarios and characters are fictional. No production databases, production credentials, API keys or customer data are used, as the hackathon rules require; each installation creates its own empty local database. Passwords are hashed with scrypt and never returned by the API. Accounts live in PostgreSQL. `.env` (database credentials) and the old `skillquest/data/accounts.json` are git-ignored; never commit them.
 
 ## Repository layout
 
 - `skillquest/` — the app and server. See `skillquest/README.md` for the file map.
-- `IMPROVEMENTS.md` — the team's earlier task plan (written before the soft/technical skills redesign).
-- `bubble-sort-visualizer.html`, `binary-search-visualizer.html` — the original standalone prototypes; the app has built-in versions.
+- `IMPROVEMENTS.md`, `SkillQuest_Hackathon_Blueprint.md` — the team's earlier planning documents.
+- `bubble-sort-visualizer.html`, `binary-search-visualizer.html`, `reverse-string-visualizer.html` — the original standalone prototypes; the app has built-in versions.
