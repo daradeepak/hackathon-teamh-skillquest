@@ -1,5 +1,5 @@
 /* AI Code Check + Animated (Pip's explainers, JavaScript Trail).
-   Ported from Deepak's version on main and plugged into the XPaddition app (developer-app.js).
+   Ported from Deepak's version on main and plugged into the XPedition app (developer-app.js).
    The host app calls XPAICheck.attach(ctx) once, then XPAICheck.render(view) for the views listed in VIEWS.
    All markup here uses data-ai-* attributes so it never collides with the host's click handler. */
 (function() {
@@ -201,21 +201,22 @@
     var editor = document.getElementById("ai-fix-editor");
     if (editor) session.code = editor.value;
     var tests = g.tests.map(function(t) { return { args: testArgs(t), expected: t.expected }; });
-    var workerCode = "self.onmessage=function(e){try{var fn=new Function('return ('+e.data.code+')')();if(typeof fn!=='function')throw new Error('Write a function to test.');var rows=e.data.tests.map(function(t){try{var actual=fn.apply(null,t.args);return{args:t.args,expected:t.expected,actual:actual,pass:JSON.stringify(actual)===JSON.stringify(t.expected)}}catch(x){return{args:t.args,expected:t.expected,actual:x.message,pass:false}}});self.postMessage({rows:rows})}catch(x){self.postMessage({error:x.message})}};";
     try {
-      var url = URL.createObjectURL(new Blob([workerCode], { type: "text/javascript" })), worker = new Worker(url);
+      /* runner-worker.js is served with a policy that blocks all network access from learner code. */
+      var worker = new Worker("runner-worker.js"), done = false;
+      function stop() { done = true; clearTimeout(timeout); worker.terminate(); }
       ctx.say("Running tests in a timed sandbox…");
-      var timeout = setTimeout(function() { worker.terminate(); URL.revokeObjectURL(url); ctx.say("That took too long. Check for a loop."); }, 1500);
+      var timeout = setTimeout(function() { if (done) return; stop(); ctx.say("That took too long. Check for a loop."); }, 1500);
       worker.onmessage = function(e) {
-        clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url);
+        stop();
         if (e.data.error) { session.tests = { all: false, passed: 0, total: tests.length, rows: tests.map(function(t) { return { args: t.args, expected: t.expected, actual: e.data.error, pass: false }; }) }; redraw(); return; }
-        var rows = e.data.rows, passed = rows.filter(function(r) { return r.pass; }).length;
+        var rows = e.data.rows.map(function(r, i) { return { args: tests[i].args, expected: tests[i].expected, actual: r.actual, pass: r.pass }; }), passed = rows.filter(function(r) { return r.pass; }).length;
         session.tests = { all: passed === rows.length, passed: passed, total: rows.length, rows: rows };
         if (passed === rows.length) finish(g, 100, "Every test passes, including the edge case. Nice catch on the missing lower bound.");
         else redraw();
       };
-      worker.onerror = function() { clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url); ctx.say("Couldn’t run that snippet. Check the syntax."); };
-      worker.postMessage({ code: session.code, tests: tests });
+      worker.onerror = function() { stop(); ctx.say("Couldn’t run that snippet. Check the syntax."); };
+      worker.postMessage({ code: session.code, name: g.functionName || "applyCoupon", tests: tests });
     } catch (e) { ctx.say("This browser couldn’t start the code runner."); }
   }
   function openChest() {
