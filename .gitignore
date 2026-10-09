@@ -1,0 +1,10 @@
+# local data and secrets
+skillquest/data/accounts.json
+skillquest/data/*.tmp
+.env
+.env.*
+!.env.example
+# tooling
+node_modules/
+.DS_Store
+.vercel/

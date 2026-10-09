@@ -50,11 +50,7 @@
       reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}) });
   }
   function seed() { return blankProgress("Learner"); }
-  function load() {
-    try { var s = JSON.parse(localStorage.getItem(KEY)); var n = normalize(s, s && s.name); if (n) return n; } catch (e) {}
-    return seed();
-  }
-  var state = load();
+  var state = seed();
   function freshAccount(name) { return blankProgress(name); }
   function accountInitials(name) {
     return String(name || "Learner").trim().split(/\s+/).slice(0, 2).map(function(part) { return part.charAt(0); }).join("").toUpperCase() || "L";
@@ -72,7 +68,7 @@
   }
   function setTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("xpaddition-theme", theme); } catch (e) {}
+    try { localStorage.setItem("xpedition-theme", theme); } catch (e) {}
     syncThemeUi();
   }
   function syncAccountUi() {
@@ -82,26 +78,62 @@
     var profileAvatar = document.getElementById("profile-avatar"), topAvatar = document.getElementById("top-avatar");
     var toggle = document.getElementById("account-toggle");
     if (profileName) profileName.textContent = name;
-    if (profileSubtitle) profileSubtitle.textContent = (account ? "Local account · " : "Guest · ") + "Level " + currentLevel() + " · " + playerLevel().name;
+    if (profileSubtitle) profileSubtitle.textContent = "Level " + currentLevel() + " · " + playerLevel().name;
     var photo = account ? account.avatar : state.avatar;
     [profileAvatar, topAvatar].forEach(function(node) { if (node) paintAvatar(node, avatar, photo); });
-    if (toggle) { toggle.textContent = account ? "Account · " + account.name : "Sign in / create account"; toggle.setAttribute("aria-label", account ? "Manage account" : "Sign in or create an account"); }
+    if (toggle) { toggle.textContent = "Account · " + name; toggle.setAttribute("aria-label", "Manage your account"); }
   }
   function normalizedProgress(progress, name) { return normalize(progress, name); }
   async function activateAccount(user) {
     account = { id: user.id, name: user.name, email: user.email, avatar: AVATAR_RE.test(user.avatar) ? user.avatar : "" };
     KEY = BASE_KEY + ":account:" + account.id;
-    var cached = null;
+    var cached = null, remote = normalizedProgress(user.progress, account.name);
     try { cached = normalizedProgress(JSON.parse(localStorage.getItem(KEY)), account.name); } catch (e) {}
-    state = cached || normalizedProgress(user.progress, account.name) || freshAccount(account.name);
-    state.name = account.name;
-    save(); syncAccountUi(); draw();
+    /* the server copy wins, unless this browser holds newer progress that hadn't been saved yet */
+    state = (remote && (!cached || remote.xp >= cached.xp) ? remote : cached) || freshAccount(account.name);
+    state.name = account.name; ensureDaily();
+    save(); syncAccountUi();
+  }
+  /* ---------- login gate: nothing in the app is usable until the player signs in ---------- */
+  function showApp() {
+    document.body.classList.remove("auth-locked");
+    var shell = document.querySelector(".app-shell"), gate = document.getElementById("auth-root");
+    if (shell) shell.hidden = false;
+    if (gate) { gate.hidden = true; gate.innerHTML = ""; }
+    syncAccountUi(); draw();
+    var main = document.getElementById("app-main"); if (main) main.focus({ preventScroll: true });
+  }
+  function renderAuth(mode, notice) {
+    stopLessonPlay(); closeAccountModal();
+    if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
+    if (window.XPBinarySearch) window.XPBinarySearch.unmount();
+    document.body.classList.add("auth-locked");
+    var shell = document.querySelector(".app-shell"), gate = document.getElementById("auth-root");
+    if (shell) shell.hidden = true;
+    if (!gate) return;
+    gate.hidden = false;
+    var signup = mode === "signup";
+    gate.innerHTML = '<main class="auth" aria-labelledby="auth-title"><section class="auth-hero"><div class="auth-brand"><span class="brand-mark xp-logo auth-logo" aria-hidden="true"><span class="xp-logo-text">XP</span><span class="xp-logo-plus">+</span></span><span class="auth-wordmark">xpedition<span class="brand-dot">.</span></span></div>' +
+      '<h2 class="auth-tagline">Level up the skills that matter at work, one short challenge at a time.</h2><ul class="auth-points"><li><span>💬</span><div><strong>Soft-skill scenarios</strong><small>Real workplace moments with no wrong answers.</small></div></li><li><span>💻</span><div><strong>HTML, CSS and JavaScript</strong><small>See the concept, then prove it in a hands-on challenge.</small></div></li><li><span>🏆</span><div><strong>XP, levels and a leaderboard</strong><small>Watch every skill grow as you play.</small></div></li></ul><div class="auth-mascot" aria-hidden="true">🦊<span>Ready for an expedition?</span></div></section>' +
+      '<section class="auth-card"><button type="button" class="theme-toggle auth-theme" data-action="theme" aria-label="Switch theme">' + (currentTheme() === "dark" ? "☀️" : "🌙") + '</button><span class="account-kicker">' + (signup ? "NEW EXPLORER" : "PLAYER LOGIN") + '</span><h1 id="auth-title">' + (signup ? "Start your expedition" : "Welcome back, explorer!") + '</h1><p class="auth-intro">' + (signup ? "Create your player card to save your XP and skills." : "Sign in to pick up right where you left off.") + '</p>' +
+      (notice ? '<p class="auth-notice" role="status">' + esc(notice) + '</p>' : "") +
+      '<div class="account-tabs" role="tablist"><button type="button" role="tab" aria-selected="' + !signup + '" data-account-mode="login" class="' + (!signup ? "active" : "") + '">Sign in</button><button type="button" role="tab" aria-selected="' + signup + '" data-account-mode="signup" class="' + (signup ? "active" : "") + '">Create account</button></div>' +
+      '<form id="auth-form" data-mode="' + (signup ? "signup" : "login") + '" novalidate>' + (signup ? '<label class="account-field">Your name<input name="name" type="text" minlength="2" maxlength="40" autocomplete="name" required placeholder="e.g. Sam Rivera"></label>' : "") +
+      '<label class="account-field">Email address<input name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@company.com"></label><label class="account-field">Password<input name="password" type="password" minlength="8" maxlength="128" autocomplete="' + (signup ? "new-password" : "current-password") + '" required placeholder="At least 8 characters"></label>' +
+      '<p id="account-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">' + (signup ? "Create my account →" : "Sign in →") + '</button></form><p class="account-local-note">Your password is stored securely hashed. You must be signed in to play.</p></section></main>';
+    var first = gate.querySelector("input"); if (first) first.focus();
+  }
+  function sessionEnded() {
+    if (!account) return;
+    account = null; state = seed(); view = "home"; current = null;
+    renderAuth("login", "Your session has ended. Please sign in again.");
   }
   async function initAccount() {
     try {
       var response = await fetch("/api/me", { headers: { "Accept": "application/json" } });
-      if (response.ok) { var result = await response.json(); if (result.user) await activateAccount(result.user); }
-    } catch (e) {}
+      if (response.ok) { var result = await response.json(); await activateAccount(result.user); showApp(); return; }
+      renderAuth("login", response.status === 401 ? "" : "We can’t reach XPedition right now. Please try again in a moment.");
+    } catch (e) { renderAuth("login", "We can’t reach XPedition right now. Check your connection and try again."); }
   }
   function closeAccountModal() {
     var modal = document.getElementById("account-modal-root");
@@ -112,12 +144,10 @@
     var modal = document.getElementById("account-modal-root");
     if (!modal) return;
     if (account) {
-      modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">YOUR PLAYER CARD</span><h2 id="account-title">Hey, ' + esc(account.name) + '!</h2><p class="account-intro">Your quests and XP are saved to this local XPaddition account.</p><div class="account-profile-card"><strong>' + esc(account.name) + '</strong><span>' + esc(account.email) + '</span><small>Level ' + currentLevel() + ' · ' + state.xp + ' XP</small></div><button class="account-submit" data-action="account-logout">Sign out</button><p class="account-local-note">Demo account · saved on this computer</p></section></div>';
+      modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">YOUR PLAYER CARD</span><h2 id="account-title">Hey, ' + esc(account.name) + '!</h2><p class="account-intro">Your quests, skills and XP are saved to your XPedition account.</p><div class="account-profile-card"><strong>' + esc(account.name) + '</strong><span>' + esc(account.email) + '</span><small>Level ' + currentLevel() + ' · ' + state.xp + ' XP</small></div><button class="account-submit" data-action="account-logout">Sign out</button></section></div>';
       return;
     }
-    var signup = accountMode === "signup";
-    modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">PLAYER LOGIN</span><h2 id="account-title">' + (signup ? "Make your player card" : "Welcome back, player!") + '</h2><p class="account-intro">' + (signup ? "Save your quests, XP and level as you play." : "Pick up your quests right where you left off.") + '</p><div class="account-tabs"><button type="button" data-account-mode="login" class="' + (!signup ? "active" : "") + '">Sign in</button><button type="button" data-account-mode="signup" class="' + (signup ? "active" : "") + '">Create account</button></div><form id="account-form" data-mode="' + (signup ? "signup" : "login") + '">' + (signup ? '<label class="account-field">Your name<input name="name" type="text" minlength="2" maxlength="40" autocomplete="name" required placeholder="e.g. Sam Rivera"></label>' : '') + '<label class="account-field">Email address<input name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"></label><label class="account-field">Password<input name="password" type="password" minlength="8" maxlength="128" autocomplete="' + (signup ? "new-password" : "current-password") + '" required placeholder="At least 8 characters"></label><p id="account-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">' + (signup ? "Create my account →" : "Let's play →") + '</button></form><p class="account-local-note">Local demo only. Use a made-up password; nothing is emailed.</p></section></div>';
-    var firstField = modal.querySelector("input"); if (firstField) firstField.focus();
+    renderAuth(mode === "signup" ? "signup" : "login");
   }
   var profileDraft = null;
   function shrinkPhoto(file) {
@@ -142,11 +172,12 @@
   }
   function renderProfileModal() {
     var modal = document.getElementById("account-modal-root"); if (!modal) return;
-    profileDraft = { name: account ? account.name : state.name, avatar: account ? account.avatar : state.avatar };
+    if (!account) return;
+    profileDraft = { name: account.name, avatar: account.avatar };
     modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><span class="account-kicker">YOUR PROFILE</span><h2 id="profile-title">Make it yours</h2>' +
       '<form id="profile-form"><div class="profile-photo-row"><span class="profile-photo" id="profile-preview" aria-hidden="true"></span><div class="profile-photo-actions"><button type="button" data-action="profile-photo">Upload photo</button><button type="button" data-action="profile-photo-remove">Remove photo</button></div><input class="profile-hidden-input" id="profile-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" aria-label="Upload a profile photo"></div>' +
       '<label class="account-field">Display name<input name="name" id="profile-name-input" type="text" minlength="2" maxlength="40" required autocomplete="name" value="' + esc(profileDraft.name) + '"></label><p id="profile-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">Save profile</button></form>' +
-      (account ? '<button class="account-secondary" data-action="account-logout">Sign out</button><p class="profile-note">Signed in as ' + esc(account.email) + '. Your name and photo show on the leaderboard.</p>' : '<button class="account-secondary" data-action="account">Sign in / create account</button><p class="profile-note">You’re playing as a guest. This profile stays on this device until you sign in.</p>') + '</section></div>';
+      ('<button class="account-secondary" data-action="account-logout">Sign out</button><p class="profile-note">Signed in as ' + esc(account.email) + '. Your name and photo show on the leaderboard.</p>') + '</section></div>';
     profilePreview();
     var field = document.getElementById("profile-name-input"); if (field) field.focus();
   }
@@ -156,20 +187,21 @@
     if (name.length < 2) { error.textContent = "Use a name with at least 2 characters."; return; }
     error.textContent = ""; button.disabled = true; button.textContent = "Saving…";
     try {
-      if (account) {
+      {
         var response = await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ name: name, avatar: profileDraft.avatar || "" }) });
         var result = await response.json();
+        if (response.status === 401) { sessionEnded(); return; }
         if (!response.ok) throw new Error(result.error || "Could not save your profile.");
         account.name = result.user.name; account.avatar = AVATAR_RE.test(result.user.avatar) ? result.user.avatar : ""; state.name = account.name;
-      } else { state.name = name; state.avatar = profileDraft.avatar || ""; }
+      }
       save(); closeAccountModal(); syncAccountUi(); draw(); say("Profile saved!");
     } catch (problem) { error.textContent = problem.message || "Could not save your profile."; button.disabled = false; button.textContent = "Save profile"; }
   }
   var lbToken = 0;
   function leaderboardPage() {
     var token = ++lbToken;
-    root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Scoreboard keeps your personal stats.</p></div></section><p class="lb-note" role="status">Loading the rankings…</p></div>';
-    fetch("/api/leaderboard", { headers: { "Accept": "application/json" } }).then(function(r) { if (!r.ok) throw new Error(); return r.json(); }).then(function(data) {
+    root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Progress page keeps your personal stats.</p></div></section><p class="lb-note" role="status">Loading the rankings…</p></div>';
+    fetch("/api/leaderboard", { headers: { "Accept": "application/json" } }).then(function(r) { if (r.status === 401) { sessionEnded(); throw new Error("signed out"); } if (!r.ok) throw new Error(); return r.json(); }).then(function(data) {
       if (token !== lbToken || view !== "leaderboard") return;
       var rows = data.players.map(function(p) {
         var photo = AVATAR_RE.test(p.avatar) ? ' has-photo" style="background-image:url(\'' + p.avatar + '\')' : "";
@@ -177,11 +209,11 @@
         return '<li class="lb-row' + (p.me ? " me" : "") + '"><span class="lb-rank">' + (p.rank <= 3 ? ["🥇", "🥈", "🥉"][p.rank - 1] : "#" + p.rank) + '</span><span class="lb-photo' + photo + '">' + esc(accountInitials(p.name)) + '</span><span class="lb-name"><span>' + esc(p.name) + (p.me ? '<span class="lb-you">YOU</span>' : "") + '</span><small>Level ' + lvl.n + ' · ' + esc(PLAYER_LEVELS[lvl.n - 1][0]) + '</small></span><span class="lb-xp">' + p.xp + ' XP</span></li>';
       }).join("");
       var body = data.players.length ? '<ol class="lb-list">' + rows + '</ol>' : '<div class="lb-list"><p class="lb-empty">No players yet. Create an account to be the first on the board.</p></div>';
-      var foot = account ? '<p class="lb-note">Showing the top players plus you. ' + data.total + ' registered in total. Rankings use the XP saved to each account.</p>' : '<p class="lb-note">Sign in or create an account to appear on the leaderboard. <button class="dev-link" data-action="account">Sign in →</button></p>';
-      root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Scoreboard keeps your personal stats.</p></div></section>' + body + foot + '</div>';
+      var foot = '<p class="lb-note">Showing the top players plus you. ' + data.total + ' registered in total.</p>';
+      root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Progress page keeps your personal stats.</p></div></section>' + body + foot + '</div>';
     }).catch(function() {
       if (token !== lbToken || view !== "leaderboard") return;
-      root.querySelector(".lb-note").textContent = "The leaderboard needs the XPaddition server. Start it with start-localhost.bat and refresh.";
+      var note = root.querySelector(".lb-note"); if (note) note.textContent = "We couldn’t load the leaderboard. Please try again in a moment.";
     });
   }
   async function submitAccount(form) {
@@ -194,23 +226,26 @@
       });
       var result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not open that account.");
-      if (form.dataset.mode === "signup") { view = "home"; current = null; hint = false; }
-      await activateAccount(result.user); closeAccountModal(); say(form.dataset.mode === "signup" ? "Player card made! Your adventure starts now." : "Welcome back! Your progress is loaded.");
+      view = "home"; current = null; hint = false;
+      await activateAccount(result.user); showApp(); say(form.dataset.mode === "signup" ? "Player card made! Your adventure starts now." : "Welcome back! Your progress is loaded.");
     } catch (problem) {
-      if (error) error.textContent = problem.message || "The local account service is unavailable.";
-      button.disabled = false; button.textContent = form.dataset.mode === "signup" ? "Create my account →" : "Let's play →";
+      if (error) error.textContent = problem.message || "We can’t reach XPedition right now. Please try again.";
+      button.disabled = false; button.textContent = form.dataset.mode === "signup" ? "Create my account →" : "Sign in →";
     }
   }
   async function signOut() {
     try { await fetch("/api/logout", { method: "POST" }); } catch (e) {}
-    account = null; KEY = BASE_KEY; state = load(); ensureDaily(); closeAccountModal(); syncAccountUi(); draw(); say("Signed out. Guest progress is still here.");
+    try { Object.keys(localStorage).forEach(function(k) { if (k.indexOf(BASE_KEY) === 0) localStorage.removeItem(k); }); } catch (e) {}
+    account = null; KEY = BASE_KEY; state = seed(); view = "home"; current = null;
+    renderAuth("login", "You’ve signed out. See you on your next expedition!");
   }
   function dayKey() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function ensureDaily() { if (!state.daily || state.daily.date !== dayKey()) state.daily = { date: dayKey(), actions: [], claimed: false }; }
   ensureDaily();
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { say("Could not save progress in this browser."); }
-    if (account) fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ progress: state }) }).catch(function() {});
+    if (account) fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ progress: state }) })
+      .then(function(r) { if (r.status === 401) sessionEnded(); }).catch(function() { say("You’re offline. Progress will sync when you’re back."); });
   }
   function esc(x) { return String(x == null ? "" : x).replace(/[&<>"']/g, function(c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
   function has(a, x) { return a.indexOf(x) >= 0; }
@@ -272,12 +307,12 @@
     else if (view === "map") { label.textContent = "Game Map"; track === "tech" ? techMap() : map(); }
     else if (view === "techskill") { label.textContent = "Game Map · " + SKILL_BY_ID[curSkill].name; techSkillPage(); }
     else if (view === "leaderboard") { label.textContent = "Leaderboard"; leaderboardPage(); }
-    else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
+    else if (view === "stats") { label.textContent = "Progress"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
-    else if (view === "anim") { label.textContent = "Animated"; animatedPage(); }
-    else if (view === "dsa") { label.textContent = "Animated · DSA"; dsaPage(); }
-    else if (view === "sort") { label.textContent = "Animated · DSA · Bubble Sort"; sortPage(); }
-    else if (view === "search") { label.textContent = "Animated · DSA · Binary Search"; searchPage(); }
+    else if (view === "anim") { label.textContent = "Play Lab"; animatedPage(); }
+    else if (view === "dsa") { label.textContent = "Play Lab · DSA"; dsaPage(); }
+    else if (view === "sort") { label.textContent = "Play Lab · DSA · Bubble Sort"; sortPage(); }
+    else if (view === "search") { label.textContent = "Play Lab · DSA · Binary Search"; searchPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
@@ -333,7 +368,7 @@
   }
   function stats() {
     var pl = playerLevel(), list = SCEN.filter(function(x) { return played(x.id); }), top = SKILLS.slice().sort(function(a, b) { return state.skills[b.id] - state.skills[a.id]; })[0];
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR SCOREBOARD</span><h1>Nice work, ' + esc(state.name) + ' ✨</h1><p>Stats track practice. They’re not a work-performance score.</p></div><button class="secondary-button" data-action="reset">Reset progress</button></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR PROGRESS</span><h1>Nice work, ' + esc(state.name) + ' ✨</h1><p>Stats track practice. They’re not a work-performance score.</p></div><button class="secondary-button" data-action="reset">Reset progress</button></section>' +
       '<section class="dev-stats-hero"><div><span class="dev-rank-pill">🏅 ' + esc(pl.name) + '</span><h2>' + state.xp + ' <small>XP</small></h2><p>Keep exploring different approaches. Every choice builds something.</p></div><div class="dev-stat-stack"><div><strong>🏅 ' + pl.n + '</strong><span>player level</span></div><div><strong>🎯 ' + list.length + '/' + SCEN.length + '</strong><span>scenarios played</span></div><div><strong>⭐ ' + (state.skills[top.id] ? esc(top.name) : "—") + '</strong><span>top skill</span></div></div></section>' +
       '<div class="dev-stats-grid"><section class="dev-panel"><div class="dev-panel-head"><h3>🧠 Skill levels</h3><span>XP by skill</span></div>' + SKILLS.map(skillRow).join("") + '<div class="dev-panel-head sk-subhead"><h3>💻 Technical skills</h3></div>' + TECH.map(skillRow).join("") + '</section>' +
       '<section class="dev-panel"><div class="dev-panel-head"><h3>🗒️ Recent scenarios</h3><span>Your approach</span></div>' + (list.length ? list.slice(-6).reverse().map(function(x) { return '<div class="score-row"><span>' + esc(x.title) + '</span><b>' + String.fromCharCode(65 + state.scenarios[x.id]) + '</b></div>'; }).join("") : '<p class="dev-muted">Play a scenario and your choices show up here.</p>') + '</section></div><p class="dev-fineprint">All progress stays in this browser unless you sign in to a local account.</p>';
@@ -369,16 +404,16 @@
   ];
   function algosDone() { return ALGOS.filter(function(a) { return a.done(); }).length; }
   function animatedPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Animated 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Play Lab 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
       '<div class="lab-module-grid">' + moduleCard("dsa", "🧮", "DSA", "DATA STRUCTURES & ALGORITHMS", "Step through classic algorithms with the real code beside the animation.", algosDone() + " of " + ALGOS.length + " completed") + '</div>' +
       '<section class="lab-footer-tip"><span>💡</span><p><b>More topics are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
   }
   function dsaPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED</span><h1>DSA 🧮</h1><p>Pick an algorithm and watch it work. Each one earns +40 XP the first time you finish it.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB</span><h1>DSA 🧮</h1><p>Pick an algorithm and watch it work. Each one earns +40 XP the first time you finish it.</p></div><button class="dev-link" data-nav="anim">← Play Lab</button></section>' +
       '<div class="lab-module-grid">' + ALGOS.map(function(a) { return moduleCard(a.view, a.icon, a.title, a.tag, a.desc, a.done() ? "Completed ✓" : "Start · +40 XP"); }).join("") + '</div>';
   }
   function searchPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Binary Search 🔎</h1><p>Pick a target, then step through or play. Finish one search to earn XP and the Search Savant badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="binary-search-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Binary Search 🔎</h1><p>Pick a target, then step through or play. Finish one search to earn XP and the Search Savant badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="binary-search-host"></div>';
   }
   function mountSearchLab() {
     var host = document.getElementById("binary-search-host");
@@ -392,7 +427,7 @@
     return { message: "🎉 " + (result.found ? "Found it" : "Ruled it out") + " in " + result.steps + " step" + (result.steps === 1 ? "" : "s") + ". +40 XP and the Search Savant badge!" };
   }
   function sortPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Bubble Sort 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="bubble-sort-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Bubble Sort 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="bubble-sort-host"></div>';
   }
   function mountSortLab() {
     var host = document.getElementById("bubble-sort-host");
@@ -536,11 +571,10 @@
   /* ---- JavaScript tests run in a Web Worker with a time limit ---- */
   function runTests(c, code) {
     return new Promise(function(resolve) {
-      var src = "self.onmessage=function(e){var d=e.data;try{var fn=new Function(d.code+'\\n;return '+d.name+';')();if(typeof fn!=='function')throw new Error('Define a function named '+d.name);var rows=d.tests.map(function(t){try{var a=fn.apply(null,t.args);return{actual:a===undefined?'undefined':a,pass:JSON.stringify(a)===JSON.stringify(t.expected)}}catch(x){return{actual:String(x.message),pass:false}}});self.postMessage({rows:rows})}catch(x){self.postMessage({error:x.message})}};";
-      var url, worker, timeout;
-      function end(result) { clearTimeout(timeout); if (worker) worker.terminate(); if (url) URL.revokeObjectURL(url); resolve(result); }
+      var worker, timeout;
+      function end(result) { clearTimeout(timeout); if (worker) worker.terminate(); resolve(result); }
       try {
-        url = URL.createObjectURL(new Blob([src], { type: "text/javascript" })); worker = new Worker(url);
+        worker = new Worker("runner-worker.js");
         timeout = setTimeout(function() { end({ error: "That took too long. Check for an infinite loop." }); }, 1500);
         worker.onmessage = function(e) {
           if (e.data.error) { end({ error: e.data.error }); return; }
@@ -766,14 +800,14 @@
     try { var C = window.AudioContext || window.webkitAudioContext; if (!C) return; var c = new C(), o = c.createOscillator(), v = c.createGain(); o.frequency.value = 740; v.gain.value = .04; o.connect(v); v.connect(c.destination); o.start(); o.stop(c.currentTime + .12); setTimeout(function() { c.close(); }, 250); } catch (e) {}
   }
   function reset() {
-    state = account ? freshAccount(account.name) : seed(); save(); go("home"); say("Fresh start! Pip is cheering you on.");
+    state = freshAccount(account ? account.name : "Learner"); save(); go("home"); say("Fresh start! Pip is cheering you on.");
   }
 
   document.addEventListener("click", function(e) {
     var brandLink = e.target.closest(".brand");
     if (brandLink) { var logo = brandLink.querySelector(".xp-logo"); if (logo) { logo.classList.remove("pop"); void logo.offsetWidth; logo.classList.add("pop"); setTimeout(function() { logo.classList.remove("pop"); }, 650); } }
     var accountModeButton = e.target.closest("[data-account-mode]");
-    if (accountModeButton) { renderAccountModal(accountModeButton.dataset.accountMode); return; }
+    if (accountModeButton) { renderAuth(accountModeButton.dataset.accountMode); return; }
     if (e.target.id === "account-modal-root" || e.target.classList.contains("account-backdrop")) { closeAccountModal(); return; }
     var nav = e.target.closest("[data-nav]");
     if (nav) { e.preventDefault(); go(nav.dataset.nav); return; }
@@ -792,7 +826,7 @@
     var skillButton = e.target.closest("[data-skill]");
     if (skillButton) { open(nextScenario(skillButton.dataset.skill)); return; }
     var actionButton = e.target.closest("[data-action]"), action = actionButton && actionButton.dataset.action;
-    if (action === "theme") setTheme(currentTheme() === "dark" ? "light" : "dark");
+    if (action === "theme") { setTheme(currentTheme() === "dark" ? "light" : "dark"); var authTheme = document.querySelector(".auth-theme"); if (authTheme) authTheme.textContent = currentTheme() === "dark" ? "☀️" : "🌙"; }
     else if (action === "profile") renderProfileModal();
     else if (action === "profile-photo") { var fileInput = document.getElementById("profile-file"); if (fileInput) fileInput.click(); }
     else if (action === "profile-photo-remove") { if (profileDraft) { profileDraft.avatar = ""; profilePreview(); } }
@@ -871,11 +905,9 @@
     if (e.key === "Enter" && e.target.classList && e.target.classList.contains("sk-blank")) { var c = CHAL_BY_ID[current]; if (c && techReady(c)) techSubmit(c); }
   });
   document.addEventListener("submit", function(e) {
-    if (e.target.id === "account-form") { e.preventDefault(); submitAccount(e.target); }
+    if (e.target.id === "auth-form") { e.preventDefault(); submitAccount(e.target); }
     if (e.target.id === "profile-form") { e.preventDefault(); submitProfile(e.target); }
   });
-  draw();
   syncThemeUi();
-  syncAccountUi();
   initAccount();
 })(); 

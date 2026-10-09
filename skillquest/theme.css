@@ -1,4 +1,4 @@
-/* XPaddition: brand logo, theme switch, avatars, leaderboard, profile dialog, scrollbars. Loaded last. */
+/* XPedition: brand logo, theme switch, avatars, leaderboard, profile dialog, scrollbars. Loaded last. */
 
 /* ---------- hide visible scrollbars (scrolling still works) ---------- */
 * { scrollbar-width: none; -ms-overflow-style: none; }
@@ -77,3 +77,39 @@ html[data-theme="dark"] .lb-photo, html[data-theme="dark"] .profile-photo.has-ph
   .xp-logo, .xp-logo-plus, .brand:active .xp-logo, .xp-logo.pop, .xp-logo.pop .xp-logo-plus { animation: none; }
   .brand:hover .xp-logo { transform: rotate(-5deg); }
 }
+
+/* ---------- login page ---------- */
+.auth-locked .app-shell { display: none; }
+.auth-root[hidden] { display: none; }
+.auth-loading { display: grid; place-items: center; min-height: 100vh; margin: 0; color: var(--muted); font: 600 15px Nunito, sans-serif; }
+.auth { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); min-height: 100vh; background: var(--canvas); }
+.auth-hero { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: 56px clamp(28px, 6vw, 80px); background: radial-gradient(circle at 20% 15%, #efedff 0, transparent 55%), radial-gradient(circle at 85% 85%, #ffe3dc 0, transparent 50%), var(--paper); overflow: hidden; }
+.auth-brand { display: flex; align-items: center; gap: 14px; }
+.auth-logo { width: 64px; height: 56px; border-radius: 16px 16px 16px 6px; }
+.auth-logo .xp-logo-text { font-size: 24px; }
+.auth-logo .xp-logo-plus { font-size: 20px; right: 6px; top: 5px; }
+.auth-wordmark { font: 700 34px Fredoka, sans-serif; letter-spacing: -.8px; color: var(--ink); }
+.auth-tagline { max-width: 520px; margin: 0; font: 600 clamp(24px, 3vw, 34px)/1.25 Fredoka, sans-serif; color: var(--ink); }
+.auth-points { display: grid; gap: 14px; max-width: 480px; margin: 0; padding: 0; list-style: none; }
+.auth-points li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255, 255, 255, .75); box-shadow: var(--shadow); }
+.auth-points li > span { font-size: 24px; line-height: 1; }
+.auth-points strong { display: block; font: 700 15px Fredoka, sans-serif; }
+.auth-points small { color: var(--muted); font-size: 13px; }
+.auth-mascot { position: absolute; right: clamp(16px, 4vw, 56px); bottom: 28px; display: flex; align-items: center; gap: 10px; font-size: 54px; animation: xp-float 3.6s ease-in-out infinite; }
+.auth-mascot span { padding: 8px 12px; border-radius: 14px 14px 14px 4px; background: #fff; box-shadow: var(--shadow); color: var(--purple-dark); font: 700 13px Nunito, sans-serif; }
+.auth-card { position: relative; display: flex; flex-direction: column; justify-content: center; width: 100%; max-width: 460px; margin: 0 auto; padding: 48px 32px; }
+.auth-card h1 { margin: 6px 0 6px; font: 700 30px Fredoka, sans-serif; color: var(--ink); }
+.auth-intro { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+.auth-theme { position: absolute; top: 24px; right: 24px; }
+.auth-notice { margin: 0 0 14px; padding: 10px 12px; border-radius: 12px; background: var(--purple-pale); color: var(--purple-dark); font-size: 13px; font-weight: 700; }
+.auth-card .account-tabs { margin-bottom: 16px; }
+.auth-card .account-field input { width: 100%; }
+.auth-card .account-submit { width: 100%; margin-top: 6px; }
+@media (max-width: 860px) {
+  .auth { grid-template-columns: 1fr; }
+  .auth-hero { padding: 36px 20px 28px; gap: 16px; }
+  .auth-points, .auth-mascot { display: none; }
+  .auth-card { padding: 24px 16px 40px; }
+  .auth-theme { top: -48px; right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .auth-mascot { animation: none; } }
