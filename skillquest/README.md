@@ -1,45 +1,38 @@
-# XPaddition app
+# XPedition app
 
-See the [main README](../README.md) for the project overview, business case and team.
+The playable app and its server. See the [root README](../README.md) for the overview, features, deployment and business case.
 
-## Run it
-- **Windows:** double-click `start-localhost.bat`.
-- **macOS / Linux:** run `node server.js` in this folder.
+## Run and test
 
-Then open http://localhost:8000. Node.js is required; no npm packages are needed.
+```bash
+cp .env.example .env   # point DATABASE_URL at PostgreSQL
+npm install
+npm start              # http://localhost:8000
+npm test               # API, security and content tests (needs a test database)
+```
 
-**Accounts and progress:**
-- Choose **Sign in / create account** to make a local player account. Accounts and progress are stored in `data/accounts.json`, which is created on first use and not committed. The sign-in session lasts while the server runs.
-- Use a made-up password. There is no email or password recovery.
-- Guest progress is saved in the browser.
+## File map
 
-## What is playable
-- **Game Map, Soft Skills:** six skills, 12 scenarios. No wrong answers; each choice awards XP to the skills it shows. The first choice per scenario counts.
-- **Game Map, Technical Skills:** HTML, CSS and JavaScript. Each challenge has a short interactive lesson first (+10 XP once), then the challenge: live CSS editor, JS test runner, fill-in, matching, ordering, tap-the-bug. Score 60% to clear; improving your best score earns the rest of its XP.
-- **Game Map, AI Code Check:** three levels (Read It, Check It, Direct It & Own It) with 9 games and 3 bosses, plus an AI Engineer teaser.
-  - Win 3 games at "Okay" (60%+) to unlock a level's boss; beat the boss to open the next level.
-  - Combos, mystery chests and 48-hour rematches.
-- **Animated:**
-  - JavaScript Trail: 12 lessons, unlocked in order, +20 XP each
-  - Pip's Code Explainers: 14 concepts
-  - DSA: Bubble Sort and Binary Search, +40 XP each
-- **Leaderboard** (needs the server and sign-in), **Scoreboard**, **Profile** (name and photo), light/dark theme, sound toggle.
-- The older Play Lab (daily quest, reels, story, badges) is hidden. To bring it back, set `LAB_ENABLED = true` in `developer-app.js` and restore its sidebar button.
-
-## Files
 | File | Purpose |
 |---|---|
-| `index.html` | Page shell and navigation |
-| `developer-app.js` | Main app: views, Soft and Technical Skills, progress, accounts UI, leaderboard, profile, theme |
-| `developer-games.js` | Soft Skills scenarios, Technical Skills challenges and lessons |
-| `aicheck-app.js` | AI Code Check games, JavaScript Trail and Pip's explainers (plugs into `developer-app.js`) |
-| `aicheck-games.js` | AI Code Check content |
-| `developer-visuals.js` | Pip's animated explainers |
-| `developer-js-lessons.js` | JavaScript Trail lessons |
-| `bubble-sort.js` / `.css` | Bubble Sort lab (styles scoped under `.bs`) |
-| `binary-search.js` / `.css` | Binary Search lab (styles scoped under `.bsr`) |
-| `style.css`, `skills.css`, `theme.css`, `aicheck.css` | Styles |
-| `server.js`, `start-localhost.bat` | Local web server and account API |
-| `data/` | Local account database (runtime only) |
+| `index.html` | Page shell: sidebar, top bar, content root |
+| `developer-app.js` | All app logic: state, views, lesson and challenge engines, scoring, accounts, leaderboard, profile, theme |
+| `developer-games.js` | Content: skills, scenarios, challenges and lessons (with the XP each option awards) |
+| `developer-js-lessons.js` | The 12-lesson JavaScript learn trail |
+| `bubble-sort.js` / `.css`, `binary-search.js` / `.css` | The two DSA labs under Play Lab |
+| `runner-worker.js` | Runs learner JavaScript against tests in a Web Worker (no network access) |
+| `theme-init.js` | Applies the saved light/dark theme before first paint |
+| `style.css`, `skills.css`, `theme.css` | Styles (the labs scope theirs under `.bs` and `.bsr`) |
+| `server.js` | Static files plus the API: register, login, logout, me, progress, profile, leaderboard, health |
+| `lib/db.js` | PostgreSQL pool and versioned schema migrations |
+| `lib/progress.js` | Validates and caps saved progress against the game content |
+| `lib/env.js` | Loads settings from `.env` |
+| `scripts/import-json-accounts.js` | One-time import of the old JSON accounts into PostgreSQL |
+| `.env.example` | All configuration settings, with comments |
+| `test/` | Node test suite (`node --test`) |
+| `start-localhost.bat`, `start.sh` | One-click start for Windows and macOS/Linux |
+| `data/` | Old JSON account file, only used by the import script (git-ignored) |
 
-All content is fictional. This is a local prototype and is not intended for production use or real passwords.
+## Adding content
+
+Scenarios, challenges and lessons are plain objects in `developer-games.js`. Run `npm test` after editing: it checks that ids are unique, every challenge has a lesson, XP goes to real skills, orderings are valid and the JavaScript challenges can be solved.

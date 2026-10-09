@@ -1,153 +1,118 @@
-# XPaddition
+# XPedition
 
-**Short, playable challenges that grow a developer's technical skills, AI code review skills and people skills.**
-
-Team H · Apty Hackathon 2026 · Theme: *Quality Education: upskilling, the non-traditional method*
-
----
+**Build soft skills and technical skills by playing.** Players sign in and then practise through short, interactive challenges: workplace scenarios with no wrong answers, and hands-on HTML, CSS and JavaScript lessons you can see, touch and then prove you understood. Every action earns XP, levels up a skill, and moves you up the leaderboard.
 
 ## 1. Project overview
 
-### The problem
-Courses and quizzes explain skills, but they rarely let people practise them. A junior developer can pass a quiz on JavaScript or on giving feedback and still freeze on the job.
+**The problem.** Most upskilling is passive: slide decks, long videos, quizzes that reward memorising. Soft skills are even harder, because there is rarely one right answer, so they are skipped or taught as lectures. New hires end up with technical know-how but little practice at the moments that decide how they work with people.
 
-AI has made this gap wider. AI assistants now write much of the code, so a developer's real job is to **read code they didn't write and check that it does what was asked.** Almost nobody trains that.
+**The solution.** XPedition teaches by doing, in two tracks that share one XP system:
 
-- **84%** of developers use or plan to use AI tools, but more of them distrust AI output (**46%**) than trust it (**33%**). The top frustration (**66%**) is AI code that is "almost right, but not quite." ([Stack Overflow Developer Survey 2025](https://survey.stackoverflow.co/2025/ai))
-- Developers already spend about **58%** of their time understanding code rather than writing it, and juniors spend more than seniors. ([Xia et al., IEEE TSE 2018](https://research.monash.edu/en/publications/measuring-program-comprehension-a-large-scale-field-study-with-pr/))
+- **Soft Skills** — 12 short workplace scenarios across six skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). There are no right or wrong answers. The approach you choose awards XP to the skills it shows, and a short note explains what that approach is good at and what to watch for.
+- **Technical Skills** — HTML, CSS and JavaScript. Each skill has a *learn, then play* path: a short interactive visual lesson (compare versions side by side, or step through code and watch its state), then a challenge. JavaScript also has a 12-lesson learn trail from your first line to async code.
 
-### Our user
-Arjun, 23, a junior JavaScript developer two months into his first job. He uses an AI assistant every day, merges code he only skimmed, and has never practised a difficult conversation at work.
+**What was built:** a complete playable app (vanilla JavaScript, no framework or build step), a Node server backed by PostgreSQL for accounts, sessions, profile, progress and the leaderboard, an automated test suite, and CI.
 
-### What we built
-A browser game with three skill areas, plus animated lessons. Every challenge gives instant feedback and XP, and players level up as they go.
+## 2. Key features
 
-| Area | What the player does |
+| Area | What you get |
 |---|---|
-| **AI Code Check** | Reads AI-written code and checks it: predicts output, spots bugs, checks a change against a ticket's acceptance criteria (**Spec Check**), audits for security problems, and fights boss rounds (fix code until tests pass, review an AI's pull request, handle a 2 AM incident) |
-| **Technical Skills** | HTML, CSS and JavaScript: a short interactive lesson, then a challenge (live CSS editor, JS test runner, matching, ordering, fill-in, tap-the-bug) |
-| **Soft Skills** | Workplace scenarios in six skills (Leadership, Communication, Problem Solving, Collaboration, Time Management, Decision Making). There are no wrong answers: each choice builds different skills, with an insight into its strength and its watch-out. |
-| **Animated** | JavaScript Trail (12 tiny animated lessons), Pip's Code Explainers (14 concepts) and DSA labs (Bubble Sort, Binary Search) |
+| Game Map | Skill cards with levels, XP and progress bars. A player level that grows with total XP. |
+| Soft-skill scenarios | 12 branching-choice scenarios. Each option awards XP to one to three skills. First choice counts, replays are practice. |
+| Interactive lessons | 24 lessons: compare-and-explore, step-through code with state, and storyboard flows. +10 XP once each. |
+| Interactive challenges | 12 challenges in six formats: live CSS editor with preview and goal checklist, JavaScript editor that runs tests, type-in blanks, match pairs, put in order, tap the buggy lines. Partial credit, and improving your best score earns the rest of the XP. |
+| Play Lab | DSA labs: **Bubble Sort** (3D, custom arrays) and **Binary Search** (lo/mid/hi markers, choose your target). Each earns XP and a badge once. |
+| Leaderboard | Registered players ranked by XP, with photos, your row highlighted. |
+| Profile | Click your avatar to change your name and upload a photo (resized in the browser). |
+| Theme | Light and Dark mode, remembered between visits. |
+| Accounts | A themed login page opens first; nothing in the app works until you sign in. Passwords are scrypt-hashed, sessions are stored hashed in PostgreSQL. |
+| Progress | Your personal stats: player level, XP per skill and recent scenarios. |
+| Accessibility | Keyboard-friendly controls, labelled inputs and live regions, reduced-motion support. |
 
----
+## 3. How to run it
 
-## 2. Business case
+You need [Node.js](https://nodejs.org) 18 or newer and [PostgreSQL](https://www.postgresql.org) 14 or newer.
 
-### Use case
-An engineering manager or L&D team assigns XPaddition to developers in their first six months. Each developer plays about 10 minutes a day:
-- AI Code Check builds the habit of verifying AI output.
-- Technical Skills fills gaps in the basics.
-- Soft Skills prepares them for reviews, deadlines and difficult conversations.
+```bash
+# 1. Create a database (one time)
+createuser -P xpedition            # choose a password
+createdb -O xpedition xpedition
 
-### Go-to-market: the first 100 users
-1. **Users 1–25:** a pilot with new developers at Apty and Excers.
-2. **Users 26–60:** one engineering-college placement cell; final-year students play before their first job.
-3. **Users 61–100:** a free daily challenge shared on LinkedIn and developer communities, collecting sign-ups.
+# 2. Configure and install (one time)
+cd skillquest
+cp .env.example .env               # set DATABASE_URL to your database
+npm install
 
-### Business model
-- **Proposed price:** ₹499 per developer per month, sold to companies (B2B).
-- **Low running cost:** the games run in the browser, so serving cost is near zero. AI features, if added, are the main variable cost.
-- **Content as the moat:** new role packs are written as content on the same game engines, with no new code.
-
-### 12-month plan
-| When | Milestone |
-|---|---|
-| Months 1–3 | Pilot; add more rounds per game; tune content from player feedback |
-| Months 4–6 | Role packs: App Developer, Backend, AI Engineer; a company admin view of team progress |
-| Months 7–12 | Custom packs built from a company's own tickets and postmortems; integration with digital adoption platforms such as Apty |
-
-**What has to be true:** pilot players return for at least three weeks, and their managers say the AI Code Check practice matches what they see in real reviews.
-
-### Business model canvas
-| Block | Summary |
-|---|---|
-| Customer segments | Engineering managers and L&D teams at IT services and SaaS companies; colleges preparing students for jobs |
-| Value proposition | Practise real developer judgement (AI code review, fundamentals, people skills) safely, in 10 minutes a day |
-| Channels | Pilots through our network, college placement cells, a free public daily challenge |
-| Customer relationships | Self-serve for players; onboarding support for company admins |
-| Revenue streams | Per-developer monthly subscription; custom content packs |
-| Key resources | Game engines, a reviewed content library, the scoring model |
-| Key activities | Writing and reviewing content, product development, pilots |
-| Key partners | Companies hiring juniors, colleges, digital adoption platforms |
-| Cost structure | Content writing and review, hosting, optional AI usage |
-
----
-
-## 3. Key features
-- **AI Code Check:** 3 levels (Read It, Check It, Direct It & Own It), 9 games + 3 boss rounds, and an AI Engineer teaser (2 games). Bosses unlock after 3 games reach "Okay". The Code Fix boss runs your JavaScript against tests in a time-limited Web Worker.
-- **Technical Skills:** 12 lessons and 12 challenges across HTML, CSS and JavaScript, using six game types.
-- **Soft Skills:** 12 scenarios across six skills, with XP awarded per skill.
-- **Animated:** JavaScript Trail (12 lessons that unlock in order), Pip's Code Explainers (14), Bubble Sort and Binary Search labs.
-- **Progress:**
-  - Shared XP, player levels and per-skill levels
-  - Combos, mystery chests and rematches in AI Code Check
-  - A scoreboard and a leaderboard
-- **Profile:** a display name and photo; light and dark themes.
-- **Accounts (local server):** register and sign in, with scrypt-hashed passwords, session cookies and progress saved to the account. Guests' progress is saved in the browser.
-
----
-
-## 4. Deployment and how to run it
-
-### Run locally (full version with accounts and leaderboard)
-Requires [Node.js](https://nodejs.org/). No npm packages are needed.
-
-- **Windows:** double-click `skillquest/start-localhost.bat`.
-- **macOS / Linux:**
-  ```bash
-  cd skillquest
-  node server.js
-  ```
-
-Then open http://localhost:8000.
-
-### Static hosting (guest mode)
-The `skillquest/` folder can be served as a static site (for example Vercel or GitHub Pages). Everything is playable as a guest. Sign-in and the leaderboard need `server.js`, so they don't work in static mode.
-
-**Deployed URL:** *not deployed yet. Add the link here.*
-
-### Project structure
-```
-skillquest/
-  index.html               page shell and navigation
-  developer-app.js         app logic: views, Soft and Technical Skills, progress, accounts UI
-  developer-games.js       Soft Skills scenarios, Technical Skills challenges and lessons
-  aicheck-app.js           AI Code Check games, JavaScript Trail, Pip's explainers
-  aicheck-games.js         AI Code Check content
-  developer-visuals.js     Pip's animated explainers (content)
-  developer-js-lessons.js  JavaScript Trail lessons (content)
-  bubble-sort.js/.css      Bubble Sort lab
-  binary-search.js/.css    Binary Search lab
-  style.css, skills.css, theme.css, aicheck.css   styles
-  server.js                local web server and account API
-  data/                    local account database (created at runtime, not committed)
+# 3. Run
+npm start                          # then open http://localhost:8000
 ```
 
----
+- The server creates its tables on first start (versioned migrations, safe to run on every start).
+- **Windows:** double-click `skillquest/start-localhost.bat`. **macOS / Linux:** `./skillquest/start.sh`.
+- **Share on your network:** set `HOST=0.0.0.0`, then open `http://<your-ip>:8000` from another device.
+- **Moving old accounts:** `node scripts/import-json-accounts.js` copies users from the earlier `data/accounts.json` into PostgreSQL (existing emails are skipped).
+- **Tests:** `createdb -O xpedition xpedition_test`, then `npm test`. Set `TEST_DATABASE_URL` if your test database lives elsewhere. The test database is wiped on every run.
 
-## 5. Team
-Team H:
+## 4. Deployment
 
-| Name | Role |
+Run `node server.js` behind an HTTPS reverse proxy (nginx, Caddy, a cloud load balancer) with a managed PostgreSQL database. Configuration is by environment variable or a `.env` file:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | *(required)* | PostgreSQL connection string. |
+| `DATABASE_SSL` | off | `require` for TLS with certificate checks (managed databases), `no-verify` for TLS without checks. |
+| `DATABASE_POOL_SIZE` | `10` | Maximum database connections. |
+| `PORT` | `8000` | Port to listen on (`0` picks a free port). |
+| `HOST` | `127.0.0.1` | Use `0.0.0.0` in a container or to share on a network. |
+| `COOKIE_SECURE` | off | Set to `1` behind HTTPS: cookies become `Secure` and HSTS is sent. |
+| `TRUST_PROXY` | off | Set to `1` behind a proxy so rate limits use the client address from `X-Forwarded-For`. |
+
+A health check at `GET /api/health` reports whether the database is reachable. The server sets a strict Content-Security-Policy, `X-Frame-Options`, `nosniff` and related headers; serves only the app's own top-level files; runs learner code in a worker that cannot reach the network; rate-limits sign-in and registration; stores session tokens hashed with expiry; and validates and caps all saved progress against the game content.
+
+**Known limits:**
+
+- Rate limits are kept in memory, so with several server instances each one counts separately. Use a shared store (or the proxy's rate limiting) when you scale out.
+- XP is calculated in the browser. The server rejects impossible values (it caps XP at what the content can award), but a determined player could still claim up to the cap. A fully trusted leaderboard needs server-side scoring.
+- There is no password reset or email verification yet.
+- Fonts load from Google Fonts; self-host them for a fully offline deployment.
+- Back up the database regularly (for example with `pg_dump`).
+
+## 5. Business case
+
+*This section is the team's proposal and should be reviewed by the whole team.*
+
+- **Use case.** Learning and development teams assign XPedition to new hires and early-career staff, so people practise real workplace moments and core technical skills in short daily sessions instead of one long course.
+- **First 100 users.** A pilot with new developers at Apty and Excers, then one engineering-college placement cell, then a free "challenge of the day" shared on LinkedIn.
+- **Business model.** ₹499 per learner per month. The challenges run in the browser at near-zero marginal cost.
+- **12-month plan.** Role packs (App Dev, Backend, QA, DevOps, Customer Success) as new content on the same engines; scenarios written from a company's own situations; manager dashboards for skill growth; integration with digital adoption platforms such as Apty.
+
+| Business model canvas | |
 |---|---|
-| Vivek | |
-| Prem | |
-| Lalitha Akhila | |
-| Margarida | |
-| Sonali | |
-| Deepak Dara | |
+| Customers | L&D teams, engineering managers, colleges and bootcamps |
+| Problem | Passive training, no practice of soft skills, hard to see skill growth |
+| Value | Short interactive practice with visible XP and skill levels |
+| Channels | Pilot partners, placement cells, social challenges |
+| Revenue | Per-learner subscription, team and campus plans |
+| Costs | Content authoring, hosting (low), support |
+| Key activities | Writing scenarios and lessons, product development |
+| Advantage | One XP system across soft and technical skills, zero-install |
 
-> **To do before submission:** fill in the roles. The commit history also includes the GitHub account **tarun-apty**. Make sure every contributor is listed.
+## 6. Team
 
----
+Vivek, Prem, Lalitha Akhila, Margarida, Sonali, Deepak Dara. *(Add each person's role.)*
 
-## 6. Credits and licences
-- **Fonts:** [Fredoka](https://fonts.google.com/specimen/Fredoka) and [Nunito](https://fonts.google.com/specimen/Nunito) from Google Fonts (SIL Open Font License).
-- **No third-party code libraries.** The app is plain HTML, CSS and JavaScript.
-- **Content** (code snippets, scenarios, lessons) was written by the team for this project. If content is later adapted from outside sources, list them here with their licences.
+## 7. Credits and licences
 
-## 7. Data and safety
-- All code, tickets, people and incidents in the game are **fictional**.
-- No production systems, production credentials or customer data are used.
-- Local accounts store passwords as **scrypt hashes**. The account file (`skillquest/data/accounts.json`) is excluded from Git.
-- XP and levels measure practice. They are **not** a work-performance score.
+- All scenarios, lessons, challenges and code are original to this project.
+- Fonts: **Fredoka** and **Nunito** from Google Fonts, licensed under the SIL Open Font License.
+- No third-party libraries, images or audio are used.
+
+## 8. Data and safety
+
+All scenarios and characters are fictional. No production data, credentials or API keys are in this repository. Passwords are hashed with scrypt and never returned by the API. Accounts live in PostgreSQL. `.env` (database credentials) and the old `skillquest/data/accounts.json` are git-ignored; never commit them.
+
+## Repository layout
+
+- `skillquest/` — the app and server. See `skillquest/README.md` for the file map.
+- `IMPROVEMENTS.md` — the team's earlier task plan (written before the soft/technical skills redesign).
+- `bubble-sort-visualizer.html`, `binary-search-visualizer.html` — the original standalone prototypes; the app has built-in versions.

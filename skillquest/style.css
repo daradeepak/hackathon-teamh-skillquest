@@ -47,6 +47,19 @@ button:focus-visible, a:focus-visible { outline: 3px solid #a79aff; outline-offs
 .icon-button { margin-left: auto; border: 0; color: #9aa3a4; background: transparent; font-size: 18px; cursor: pointer; }
 .main-area { min-width: 0; padding: 0 43px 22px; display: flex; flex-direction: column; }
 .topbar { height: 78px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e4e5df; }
+.daily-taskbar { margin: 0 0 16px; border: 1px solid #f2dba0; border-radius: 16px; background: linear-gradient(100deg, #fff7dd, #fff1d0 55%, #fff7e8); box-shadow: 0 5px 14px rgba(168, 126, 42, .08); }
+.daily-taskbar-inner { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 10px 14px; }
+.daily-taskbar-label { font: 800 10px Fredoka, sans-serif; letter-spacing: .6px; color: #8a6520; white-space: nowrap; }
+.daily-taskbar-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 140px; }
+.daily-taskbar-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(186, 143, 51, .25); background: rgba(255, 255, 255, .65); color: #684b12; font-size: 11px; font-weight: 700; }
+.daily-taskbar-chip.done { border-color: #9fd4a8; background: #eefbf0; color: #2d6b3f; }
+.daily-taskbar-progress { height: 7px; flex: 1 1 120px; min-width: 80px; max-width: 200px; border-radius: 9px; background: rgba(186, 143, 51, .16); overflow: hidden; }
+.daily-taskbar-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f1b940, #ff8c71); transition: width .4s ease; }
+.daily-taskbar-claim, .daily-taskbar-more { border: 0; border-radius: 999px; padding: 7px 12px; font-size: 10px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.daily-taskbar-claim { background: linear-gradient(135deg, #705ce8, #9a6bff); color: #fff; }
+.daily-taskbar-claim:disabled { opacity: .55; cursor: default; }
+.daily-taskbar-more { background: rgba(255, 255, 255, .75); color: #684b12; border: 1px solid rgba(186, 143, 51, .3); }
+.daily-taskbar-more:hover { background: #fff; }
 .breadcrumb { font-size: 12px; color: #939d9e; display: flex; gap: 10px; align-items: center; }
 .breadcrumb strong { color: var(--ink); font-size: 12px; font-weight: 600; }
 .breadcrumb-slash { color: #c4c9c6; }
@@ -673,6 +686,8 @@ body { background: radial-gradient(circle at 90% 3%, #eee8ff 0, transparent 25re
 @media (max-width: 620px) {
   .dev-daily-banner { flex-wrap: wrap; }
   .daily-banner-progress { order: 5; flex-basis: 100%; }
+  .daily-taskbar-inner { justify-content: flex-start; }
+  .daily-taskbar-progress { order: 10; flex-basis: 100%; max-width: none; }
   .lab-module-grid { grid-template-columns: 1fr; }
   .lab-module-card { min-height: 150px; }
   .lab-feature-row { padding: 17px; }

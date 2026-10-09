@@ -2,11 +2,18 @@
   "use strict";
   var D = window.DEVQUEST_CONTENT, SKILLS = D.skills, SCEN = D.scenarios, TECH = D.techSkills, CHAL = D.challenges, LESSONS = D.lessons, root = document.getElementById("app-main");
   var label = document.getElementById("page-label"), toast = document.getElementById("toast");
-  var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "core", hint = false;
+  var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "tech", hint = false;
   var account = null, accountMode = "login";
-  var AI = window.XPAICheck || null; /* AI Code Check + JS Trail module (aicheck-app.js) */
+  var TRAIL = ((window.DEVQUEST_JS_LESSONS && window.DEVQUEST_JS_LESSONS.lessons) || []).map(function(l) {
+    return { id: l.id, skill: "javascript", title: l.title, icon: l.icon, world: l.world, trail: true };
+  });
+  var TRAIL_BY_ID = {}, TRAIL_WORLDS = [];
   var SKILL_BY_ID = {}, SCEN_BY_ID = {}, CHAL_BY_ID = {};
-  SKILLS.concat(TECH).forEach(function(k) { SKILL_BY_ID[k.id] = k; }); SCEN.forEach(function(x) { SCEN_BY_ID[x.id] = x; }); CHAL.forEach(function(x) { CHAL_BY_ID[x.id] = x; });
+  SKILLS.concat(TECH).forEach(function(k) { SKILL_BY_ID[k.id] = k; });
+  TRAIL.forEach(function(t) { TRAIL_BY_ID[t.id] = t; if (TRAIL_WORLDS.indexOf(t.world) < 0) TRAIL_WORLDS.push(t.world); });
+  ((window.DEVQUEST_JS_LESSONS && window.DEVQUEST_JS_LESSONS.lessons) || []).forEach(function(l) {
+    LESSONS[l.id] = { title: l.title, kind: "nodes", intro: l.intro, code: l.code, steps: l.steps, key: l.steps[l.steps.length - 1].takeaway };
+  }); SCEN.forEach(function(x) { SCEN_BY_ID[x.id] = x; }); CHAL.forEach(function(x) { CHAL_BY_ID[x.id] = x; });
   var timer = null, session = fresh(), reelIndex = 0, reelRevealed = false, reelAnswer = null, reelFeedback = "";
   var REELS = [
     { id: "trace", title: "Trace before you trust", tag: "CODE READING", icon: "🔎", hook: "AI says this returns 12. Can you spot the tiny twist?", lesson: "Follow the values line by line. Here, the loop adds each price multiplied by its quantity. A test can pass while your mental model is still off.", question: "For items [{price: 2, qty: 3}, {price: 4, qty: 1}], what is the total?", options: ["9", "10", "14"], answer: 1 },
@@ -25,7 +32,7 @@
   function blankProgress(name) {
     return { name: name || "Learner", avatar: "", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, lessons: {}, daily: { date: dayKey(), actions: [], claimed: false },
       reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 },
-      aicheck: AI ? AI.blank() : {}, jsLessons: [] };
+      minigames: { matchBest: 0, truthBest: 0, bracketBest: 0, memoryBestEasy: 0, memoryBestMedium: 0, memoryBestHard: 0, gitlineBest: 0, kebabBest: 0, statusBest: 0, xpBanked: 0 } };
   }
   /* Accepts saved progress from this or an older version and keeps only values that are still valid. */
   function normalize(p, name) {
@@ -40,63 +47,132 @@
       var v = Number(p.tech[id]); if (CHAL_BY_ID[id] && isFinite(v) && v > 0) tech[id] = Math.min(100, Math.round(v));
     });
     if (p.lessons && typeof p.lessons === "object") Object.keys(p.lessons).forEach(function(id) { if (LESSONS[id] && p.lessons[id]) learned[id] = true; });
+    var mg = p.minigames && typeof p.minigames === "object" ? p.minigames : {};
     return Object.assign(base, { lessons: learned, avatar: AVATAR_RE.test(p.avatar) ? p.avatar : "", tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
       reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}),
-      aicheck: AI ? AI.normalize(p.aicheck) : base.aicheck, jsLessons: AI ? AI.normalizeLessons(p.jsLessons) : [] });
+      minigames: { matchBest: Math.max(0, Math.floor(Number(mg.matchBest)) || 0), truthBest: Math.max(0, Math.floor(Number(mg.truthBest)) || 0), bracketBest: Math.max(0, Math.floor(Number(mg.bracketBest)) || 0), memoryBestEasy: Math.max(0, Math.floor(Number(mg.memoryBestEasy)) || 0), memoryBestMedium: Math.max(0, Math.floor(Number(mg.memoryBestMedium)) || 0), memoryBestHard: Math.max(0, Math.floor(Number(mg.memoryBestHard)) || 0, Math.floor(Number(mg.memoryBest)) || 0), gitlineBest: Math.max(0, Math.floor(Number(mg.gitlineBest)) || 0), kebabBest: Math.max(0, Math.floor(Number(mg.kebabBest)) || 0), statusBest: Math.max(0, Math.floor(Number(mg.statusBest)) || 0), xpBanked: Math.max(0, Math.floor(Number(mg.xpBanked)) || 0) } });
   }
   function seed() { return blankProgress("Learner"); }
-  function load() {
-    try { var s = JSON.parse(localStorage.getItem(KEY)); var n = normalize(s, s && s.name); if (n) return n; } catch (e) {}
-    return seed();
-  }
-  var state = load();
+  var state = seed();
   function freshAccount(name) { return blankProgress(name); }
   function accountInitials(name) {
     return String(name || "Learner").trim().split(/\s+/).slice(0, 2).map(function(part) { return part.charAt(0); }).join("").toUpperCase() || "L";
   }
+  /* ---------- avatars: an uploaded photo, one of the preset characters, or the default silhouette ---------- */
+  var AVATAR_PRESETS = [
+    { id: "fox", emoji: "🦊", bg: "#ffe3cc" }, { id: "owl", emoji: "🦉", bg: "#e6e0ff" }, { id: "panda", emoji: "🐼", bg: "#e3f4e6" }, { id: "cat", emoji: "🐱", bg: "#fff1cc" },
+    { id: "robot", emoji: "🤖", bg: "#dcefff" }, { id: "rocket", emoji: "🚀", bg: "#fde2ea" }, { id: "koala", emoji: "🐨", bg: "#e9edf3" }, { id: "octopus", emoji: "🐙", bg: "#ffe0f0" }
+  ];
+  function presetFor(value) { var m = /^preset:([a-z]+)$/.exec(value || ""); return m ? AVATAR_PRESETS.find(function(p) { return p.id === m[1]; }) : null; }
+  function validAvatar(value) { return AVATAR_RE.test(value || "") || !!presetFor(value); }
   function paintAvatar(node, initials, photo) {
-    node.textContent = initials;
-    if (photo && AVATAR_RE.test(photo)) { node.style.backgroundImage = 'url("' + photo + '")'; node.classList.add("has-photo"); }
-    else { node.style.backgroundImage = ""; node.classList.remove("has-photo"); }
+    var preset = presetFor(photo);
+    node.classList.remove("has-photo", "has-preset", "avatar-default");
+    node.style.backgroundImage = ""; node.style.backgroundColor = "";
+    if (photo && AVATAR_RE.test(photo)) { node.textContent = ""; node.style.backgroundImage = 'url("' + photo + '")'; node.classList.add("has-photo"); }
+    else if (preset) { node.textContent = preset.emoji; node.style.backgroundColor = preset.bg; node.classList.add("has-preset"); }
+    else { node.textContent = ""; node.classList.add("avatar-default"); }
   }
+  function avatarHtml(cls, value) {
+    var preset = presetFor(value);
+    if (AVATAR_RE.test(value || "")) return '<span class="' + cls + ' has-photo" style="background-image:url(\'' + value + '\')" aria-hidden="true"></span>';
+    if (preset) return '<span class="' + cls + ' has-preset" style="background-color:' + preset.bg + '" aria-hidden="true">' + preset.emoji + '</span>';
+    return '<span class="' + cls + ' avatar-default" aria-hidden="true"></span>';
+  }
+  var SETTINGS_KEY = "xpedition-settings";
+  var DEFAULT_SETTINGS = { textSize: "normal", motion: "system", lessonSpeed: "normal", mapStart: "tech" };
+  function getSettings() {
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch (e) {}
+    return Object.assign({}, DEFAULT_SETTINGS, saved);
+  }
+  function applySettings(settings) {
+    var html = document.documentElement;
+    html.classList.toggle("text-large", settings.textSize === "large");
+    html.classList.toggle("text-larger", settings.textSize === "larger");
+    html.classList.toggle("reduce-motion", settings.motion === "reduce");
+  }
+  function setSetting(key, value) {
+    var settings = getSettings(); settings[key] = value;
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+    applySettings(settings);
+  }
+  function lessonInterval() { return { slow: 3400, normal: 2200, fast: 1300 }[getSettings().lessonSpeed] || 2200; }
   function currentTheme() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
   function syncThemeUi() {
     var dark = currentTheme() === "dark", button = document.getElementById("theme-toggle"), meta = document.querySelector('meta[name="theme-color"]');
     if (button) { button.textContent = dark ? "☀️" : "🌙"; button.setAttribute("aria-pressed", String(dark)); button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode"); button.title = dark ? "Switch to light mode" : "Switch to dark mode"; }
     if (meta) meta.setAttribute("content", dark ? "#14161c" : "#f3f3ee");
   }
+  function themeChoice() { try { return localStorage.getItem("xpedition-theme") || "system"; } catch (e) { return "system"; } }
   function setTheme(theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("xpaddition-theme", theme); } catch (e) {}
+    var resolved = theme === "system" ? (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme;
+    document.documentElement.setAttribute("data-theme", resolved);
+    try { if (theme === "system") localStorage.removeItem("xpedition-theme"); else localStorage.setItem("xpedition-theme", theme); } catch (e) {}
     syncThemeUi();
   }
   function syncAccountUi() {
     var name = account ? account.name : state.name;
     var avatar = accountInitials(name);
+    var settingsEntry = document.getElementById("settings-entry"); if (settingsEntry) settingsEntry.setAttribute("aria-label", "Open settings for " + name);
     var profileName = document.getElementById("profile-name"), profileSubtitle = document.getElementById("profile-subtitle");
     var profileAvatar = document.getElementById("profile-avatar"), topAvatar = document.getElementById("top-avatar");
-    var toggle = document.getElementById("account-toggle");
     if (profileName) profileName.textContent = name;
-    if (profileSubtitle) profileSubtitle.textContent = (account ? "Local account · " : "Guest · ") + "Level " + currentLevel() + " · " + playerLevel().name;
+    if (profileSubtitle) profileSubtitle.textContent = "Level " + currentLevel() + " · " + playerLevel().name;
     var photo = account ? account.avatar : state.avatar;
     [profileAvatar, topAvatar].forEach(function(node) { if (node) paintAvatar(node, avatar, photo); });
-    if (toggle) { toggle.textContent = account ? "Account · " + account.name : "Sign in / create account"; toggle.setAttribute("aria-label", account ? "Manage account" : "Sign in or create an account"); }
   }
   function normalizedProgress(progress, name) { return normalize(progress, name); }
   async function activateAccount(user) {
-    account = { id: user.id, name: user.name, email: user.email, avatar: AVATAR_RE.test(user.avatar) ? user.avatar : "" };
+    account = { id: user.id, name: user.name, email: user.email, avatar: validAvatar(user.avatar) ? user.avatar : "" };
     KEY = BASE_KEY + ":account:" + account.id;
-    var cached = null;
+    var cached = null, remote = normalizedProgress(user.progress, account.name);
     try { cached = normalizedProgress(JSON.parse(localStorage.getItem(KEY)), account.name); } catch (e) {}
-    state = cached || normalizedProgress(user.progress, account.name) || freshAccount(account.name);
-    state.name = account.name;
-    save(); syncAccountUi(); draw();
+    /* the server copy wins, unless this browser holds newer progress that hadn't been saved yet */
+    state = (remote && (!cached || remote.xp >= cached.xp) ? remote : cached) || freshAccount(account.name);
+    state.name = account.name; ensureDaily();
+    save(); syncAccountUi();
+  }
+  /* ---------- login gate: nothing in the app is usable until the player signs in ---------- */
+  function showApp() {
+    document.body.classList.remove("auth-locked");
+    var shell = document.querySelector(".app-shell"), gate = document.getElementById("auth-root");
+    if (shell) shell.hidden = false;
+    if (gate) { gate.hidden = true; gate.innerHTML = ""; }
+    syncAccountUi(); syncDailyTaskbar(); draw();
+    var main = document.getElementById("app-main"); if (main) main.focus({ preventScroll: true });
+  }
+  function renderAuth(mode, notice) {
+    stopLessonPlay(); closeAccountModal();
+    if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
+    if (window.XPBinarySearch) window.XPBinarySearch.unmount();
+    document.body.classList.add("auth-locked");
+    var shell = document.querySelector(".app-shell"), gate = document.getElementById("auth-root");
+    if (shell) shell.hidden = true;
+    if (!gate) return;
+    gate.hidden = false;
+    var signup = mode === "signup";
+    gate.innerHTML = '<main class="auth" aria-labelledby="auth-title"><section class="auth-hero"><div class="auth-brand"><span class="brand-mark xp-logo auth-logo" aria-hidden="true"><span class="xp-logo-text">XP</span><span class="xp-logo-plus">+</span></span><span class="auth-wordmark">XPedition<span class="brand-dot">.</span></span></div>' +
+      '<h2 class="auth-tagline">Level up the skills that matter at work, one short challenge at a time.</h2><ul class="auth-points"><li><span>💬</span><div><strong>Soft-skill scenarios</strong><small>Real workplace moments with no wrong answers.</small></div></li><li><span>💻</span><div><strong>HTML, CSS and JavaScript</strong><small>See the concept, then prove it in a hands-on challenge.</small></div></li><li><span>🏆</span><div><strong>XP, levels and a leaderboard</strong><small>Watch every skill grow as you play.</small></div></li></ul><div class="auth-mascot" aria-hidden="true">🦊<span>Ready for XPedition?</span></div></section>' +
+      '<section class="auth-card"><button type="button" class="theme-toggle auth-theme" data-action="theme" aria-label="Switch theme">' + (currentTheme() === "dark" ? "☀️" : "🌙") + '</button><span class="account-kicker">' + (signup ? "NEW EXPLORER" : "PLAYER LOGIN") + '</span><h1 id="auth-title">' + (signup ? "Start your XPedition" : "Welcome back, explorer!") + '</h1><p class="auth-intro">' + (signup ? "Create your player card to save your XP and skills." : "Sign in to pick up right where you left off.") + '</p>' +
+      (notice ? '<p class="auth-notice" role="status">' + esc(notice) + '</p>' : "") +
+      '<div class="account-tabs" role="tablist"><button type="button" role="tab" aria-selected="' + !signup + '" data-account-mode="login" class="' + (!signup ? "active" : "") + '">Sign in</button><button type="button" role="tab" aria-selected="' + signup + '" data-account-mode="signup" class="' + (signup ? "active" : "") + '">Create account</button></div>' +
+      '<form id="auth-form" data-mode="' + (signup ? "signup" : "login") + '" novalidate>' + (signup ? '<label class="account-field">Your name<input name="name" type="text" minlength="2" maxlength="40" autocomplete="name" required placeholder="e.g. Sam Rivera"></label>' : "") +
+      '<label class="account-field">Email address<input name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@company.com"></label><label class="account-field">Password<input name="password" type="password" minlength="8" maxlength="128" autocomplete="' + (signup ? "new-password" : "current-password") + '" required placeholder="At least 8 characters"></label>' +
+      '<p id="account-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">' + (signup ? "Create my account →" : "Sign in →") + '</button></form><p class="account-local-note">Your password is stored securely hashed. You must be signed in to play.</p></section></main>';
+    var first = gate.querySelector("input"); if (first) first.focus();
+  }
+  function sessionEnded() {
+    if (!account) return;
+    account = null; state = seed(); view = "home"; current = null;
+    renderAuth("login", "Your session has ended. Please sign in again.");
   }
   async function initAccount() {
     try {
       var response = await fetch("/api/me", { headers: { "Accept": "application/json" } });
-      if (response.ok) { var result = await response.json(); if (result.user) await activateAccount(result.user); }
-    } catch (e) {}
+      if (response.ok) { var result = await response.json(); await activateAccount(result.user); showApp(); return; }
+      renderAuth("login", response.status === 401 ? "" : "We can’t reach XPedition right now. Please try again in a moment.");
+    } catch (e) { renderAuth("login", "We can’t reach XPedition right now. Check your connection and try again."); }
   }
   function closeAccountModal() {
     var modal = document.getElementById("account-modal-root");
@@ -107,12 +183,10 @@
     var modal = document.getElementById("account-modal-root");
     if (!modal) return;
     if (account) {
-      modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">YOUR PLAYER CARD</span><h2 id="account-title">Hey, ' + esc(account.name) + '!</h2><p class="account-intro">Your quests and XP are saved to this local XPaddition account.</p><div class="account-profile-card"><strong>' + esc(account.name) + '</strong><span>' + esc(account.email) + '</span><small>Level ' + currentLevel() + ' · ' + state.xp + ' XP</small></div><button class="account-submit" data-action="account-logout">Sign out</button><p class="account-local-note">Demo account · saved on this computer</p></section></div>';
+      modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">YOUR PLAYER CARD</span><h2 id="account-title">Hey, ' + esc(account.name) + '!</h2><p class="account-intro">Your quests, skills and XP are saved to your XPedition account.</p><div class="account-profile-card"><strong>' + esc(account.name) + '</strong><span>' + esc(account.email) + '</span><small>Level ' + currentLevel() + ' · ' + state.xp + ' XP</small></div><button class="account-submit" data-action="account-logout">Sign out</button></section></div>';
       return;
     }
-    var signup = accountMode === "signup";
-    modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><div class="account-mark">🦊</div><span class="account-kicker">PLAYER LOGIN</span><h2 id="account-title">' + (signup ? "Make your player card" : "Welcome back, player!") + '</h2><p class="account-intro">' + (signup ? "Save your quests, XP and level as you play." : "Pick up your quests right where you left off.") + '</p><div class="account-tabs"><button type="button" data-account-mode="login" class="' + (!signup ? "active" : "") + '">Sign in</button><button type="button" data-account-mode="signup" class="' + (signup ? "active" : "") + '">Create account</button></div><form id="account-form" data-mode="' + (signup ? "signup" : "login") + '">' + (signup ? '<label class="account-field">Your name<input name="name" type="text" minlength="2" maxlength="40" autocomplete="name" required placeholder="e.g. Sam Rivera"></label>' : '') + '<label class="account-field">Email address<input name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com"></label><label class="account-field">Password<input name="password" type="password" minlength="8" maxlength="128" autocomplete="' + (signup ? "new-password" : "current-password") + '" required placeholder="At least 8 characters"></label><p id="account-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">' + (signup ? "Create my account →" : "Let's play →") + '</button></form><p class="account-local-note">Local demo only. Use a made-up password; nothing is emailed.</p></section></div>';
-    var firstField = modal.querySelector("input"); if (firstField) firstField.focus();
+    renderAuth(mode === "signup" ? "signup" : "login");
   }
   var profileDraft = null;
   function shrinkPhoto(file) {
@@ -137,11 +211,12 @@
   }
   function renderProfileModal() {
     var modal = document.getElementById("account-modal-root"); if (!modal) return;
-    profileDraft = { name: account ? account.name : state.name, avatar: account ? account.avatar : state.avatar };
+    if (!account) return;
+    profileDraft = { name: account.name, avatar: account.avatar };
     modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><span class="account-kicker">YOUR PROFILE</span><h2 id="profile-title">Make it yours</h2>' +
-      '<form id="profile-form"><div class="profile-photo-row"><span class="profile-photo" id="profile-preview" aria-hidden="true"></span><div class="profile-photo-actions"><button type="button" data-action="profile-photo">Upload photo</button><button type="button" data-action="profile-photo-remove">Remove photo</button></div><input class="profile-hidden-input" id="profile-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" aria-label="Upload a profile photo"></div>' +
-      '<label class="account-field">Display name<input name="name" id="profile-name-input" type="text" minlength="2" maxlength="40" required autocomplete="name" value="' + esc(profileDraft.name) + '"></label><p id="profile-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">Save profile</button></form>' +
-      (account ? '<button class="account-secondary" data-action="account-logout">Sign out</button><p class="profile-note">Signed in as ' + esc(account.email) + '. Your name and photo show on the leaderboard.</p>' : '<button class="account-secondary" data-action="account">Sign in / create account</button><p class="profile-note">You’re playing as a guest. This profile stays on this device until you sign in.</p>') + '</section></div>';
+      '<form id="profile-form"><div class="profile-photo-row"><span class="profile-photo" id="profile-preview" aria-hidden="true"></span><div class="profile-photo-actions"><button type="button" data-action="profile-photo">Upload photo</button><button type="button" data-action="profile-photo-remove">Use default</button></div><input class="profile-hidden-input" id="profile-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1" aria-label="Upload a profile photo"></div>' +
+      '<div class="avatar-presets" role="group" aria-label="Pick an avatar">' + AVATAR_PRESETS.map(function(p) { return '<button type="button" class="avatar-preset' + (profileDraft.avatar === "preset:" + p.id ? " on" : "") + '" data-preset="' + p.id + '" style="background-color:' + p.bg + '" aria-label="Use the ' + p.id + ' avatar" aria-pressed="' + (profileDraft.avatar === "preset:" + p.id) + '">' + p.emoji + '</button>'; }).join("") + '</div><label class="account-field">Display name<input name="name" id="profile-name-input" type="text" minlength="2" maxlength="40" required autocomplete="name" value="' + esc(profileDraft.name) + '"></label><p id="profile-error" class="account-error" role="alert"></p><button class="account-submit" type="submit">Save profile</button></form>' +
+      ('<button class="account-secondary" data-action="account-logout">Sign out</button><p class="profile-note">Signed in as ' + esc(account.email) + '. Your name and photo show on the leaderboard.</p>') + '</section></div>';
     profilePreview();
     var field = document.getElementById("profile-name-input"); if (field) field.focus();
   }
@@ -151,32 +226,32 @@
     if (name.length < 2) { error.textContent = "Use a name with at least 2 characters."; return; }
     error.textContent = ""; button.disabled = true; button.textContent = "Saving…";
     try {
-      if (account) {
+      {
         var response = await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ name: name, avatar: profileDraft.avatar || "" }) });
         var result = await response.json();
+        if (response.status === 401) { sessionEnded(); return; }
         if (!response.ok) throw new Error(result.error || "Could not save your profile.");
-        account.name = result.user.name; account.avatar = AVATAR_RE.test(result.user.avatar) ? result.user.avatar : ""; state.name = account.name;
-      } else { state.name = name; state.avatar = profileDraft.avatar || ""; }
+        account.name = result.user.name; account.avatar = validAvatar(result.user.avatar) ? result.user.avatar : ""; state.name = account.name;
+      }
       save(); closeAccountModal(); syncAccountUi(); draw(); say("Profile saved!");
     } catch (problem) { error.textContent = problem.message || "Could not save your profile."; button.disabled = false; button.textContent = "Save profile"; }
   }
   var lbToken = 0;
   function leaderboardPage() {
     var token = ++lbToken;
-    root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Scoreboard keeps your personal stats.</p></div></section><p class="lb-note" role="status">Loading the rankings…</p></div>';
-    fetch("/api/leaderboard", { headers: { "Accept": "application/json" } }).then(function(r) { if (!r.ok) throw new Error(); return r.json(); }).then(function(data) {
+    root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Progress page keeps your personal stats.</p></div></section><p class="lb-note" role="status">Loading the rankings…</p></div>';
+    fetch("/api/leaderboard", { headers: { "Accept": "application/json" } }).then(function(r) { if (r.status === 401) { sessionEnded(); throw new Error("signed out"); } if (!r.ok) throw new Error(); return r.json(); }).then(function(data) {
       if (token !== lbToken || view !== "leaderboard") return;
       var rows = data.players.map(function(p) {
-        var photo = AVATAR_RE.test(p.avatar) ? ' has-photo" style="background-image:url(\'' + p.avatar + '\')' : "";
         var lvl = levelInfo(p.xp, PLAYER_AT);
-        return '<li class="lb-row' + (p.me ? " me" : "") + '"><span class="lb-rank">' + (p.rank <= 3 ? ["🥇", "🥈", "🥉"][p.rank - 1] : "#" + p.rank) + '</span><span class="lb-photo' + photo + '">' + esc(accountInitials(p.name)) + '</span><span class="lb-name"><span>' + esc(p.name) + (p.me ? '<span class="lb-you">YOU</span>' : "") + '</span><small>Level ' + lvl.n + ' · ' + esc(PLAYER_LEVELS[lvl.n - 1][0]) + '</small></span><span class="lb-xp">' + p.xp + ' XP</span></li>';
+        return '<li class="lb-row' + (p.me ? " me" : "") + '"><span class="lb-rank">' + (p.rank <= 3 ? ["🥇", "🥈", "🥉"][p.rank - 1] : "#" + p.rank) + '</span>' + avatarHtml("lb-photo", p.avatar) + '<span class="lb-name"><span>' + esc(p.name) + (p.me ? '<span class="lb-you">YOU</span>' : "") + '</span><small>Level ' + lvl.n + ' · ' + esc(PLAYER_LEVELS[lvl.n - 1][0]) + '</small></span><span class="lb-xp">' + p.xp + ' XP</span></li>';
       }).join("");
       var body = data.players.length ? '<ol class="lb-list">' + rows + '</ol>' : '<div class="lb-list"><p class="lb-empty">No players yet. Create an account to be the first on the board.</p></div>';
-      var foot = account ? '<p class="lb-note">Showing the top players plus you. ' + data.total + ' registered in total. Rankings use the XP saved to each account.</p>' : '<p class="lb-note">Sign in or create an account to appear on the leaderboard. <button class="dev-link" data-action="account">Sign in →</button></p>';
-      root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Scoreboard keeps your personal stats.</p></div></section>' + body + foot + '</div>';
+      var foot = '<p class="lb-note">Showing the top players plus you. ' + data.total + ' registered in total.</p>';
+      root.innerHTML = '<div class="sk lb"><section class="sk-head"><div><span class="sk-eyebrow">TOP PLAYERS</span><h1>Leaderboard 🏆</h1><p>Registered players ranked by XP. Your Progress page keeps your personal stats.</p></div></section>' + body + foot + '</div>';
     }).catch(function() {
       if (token !== lbToken || view !== "leaderboard") return;
-      root.querySelector(".lb-note").textContent = "The leaderboard needs the XPaddition server. Start it with start-localhost.bat and refresh.";
+      var note = root.querySelector(".lb-note"); if (note) note.textContent = "We couldn’t load the leaderboard. Please try again in a moment.";
     });
   }
   async function submitAccount(form) {
@@ -189,23 +264,26 @@
       });
       var result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not open that account.");
-      if (form.dataset.mode === "signup") { view = "home"; current = null; hint = false; }
-      await activateAccount(result.user); closeAccountModal(); say(form.dataset.mode === "signup" ? "Player card made! Your adventure starts now." : "Welcome back! Your progress is loaded.");
+      view = "home"; current = null; hint = false;
+      await activateAccount(result.user); showApp(); say(form.dataset.mode === "signup" ? "Player card made! Your adventure starts now." : "Welcome back! Your progress is loaded.");
     } catch (problem) {
-      if (error) error.textContent = problem.message || "The local account service is unavailable.";
-      button.disabled = false; button.textContent = form.dataset.mode === "signup" ? "Create my account →" : "Let's play →";
+      if (error) error.textContent = problem.message || "We can’t reach XPedition right now. Please try again.";
+      button.disabled = false; button.textContent = form.dataset.mode === "signup" ? "Create my account →" : "Sign in →";
     }
   }
   async function signOut() {
     try { await fetch("/api/logout", { method: "POST" }); } catch (e) {}
-    account = null; KEY = BASE_KEY; state = load(); ensureDaily(); closeAccountModal(); syncAccountUi(); draw(); say("Signed out. Guest progress is still here.");
+    try { Object.keys(localStorage).forEach(function(k) { if (k.indexOf(BASE_KEY) === 0) localStorage.removeItem(k); }); } catch (e) {}
+    account = null; KEY = BASE_KEY; state = seed(); view = "home"; current = null;
+    renderAuth("login", "You’ve signed out. See you on your next expedition!");
   }
   function dayKey() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function ensureDaily() { if (!state.daily || state.daily.date !== dayKey()) state.daily = { date: dayKey(), actions: [], claimed: false }; }
   ensureDaily();
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { say("Could not save progress in this browser."); }
-    if (account) fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ progress: state }) }).catch(function() {});
+    if (account) fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ progress: state }) })
+      .then(function(r) { if (r.status === 401) sessionEnded(); }).catch(function() { say("You’re offline. Progress will sync when you’re back."); });
   }
   function esc(x) { return String(x == null ? "" : x).replace(/[&<>"']/g, function(c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]; }); }
   function has(a, x) { return a.indexOf(x) >= 0; }
@@ -249,40 +327,70 @@
     return (pool.find(function(x) { return !techDone(x.id); }) || pool.find(function(x) { return techBest(x.id) < 100; }) || pool[0]).id;
   }
   var curSkill = TECH[0].id, lessonTimer = null;
+  function lessonItem(id) { return CHAL_BY_ID[id] || TRAIL_BY_ID[id]; }
   function stopLessonPlay() { if (lessonTimer) clearInterval(lessonTimer); lessonTimer = null; }
   function open(id, forceLesson) {
-    if (!SCEN_BY_ID[id] && !CHAL_BY_ID[id]) return;
-    track = CHAL_BY_ID[id] ? "tech" : "core";
+    if (!SCEN_BY_ID[id] && !CHAL_BY_ID[id] && !TRAIL_BY_ID[id]) return;
+    track = (CHAL_BY_ID[id] || TRAIL_BY_ID[id]) ? "tech" : "core";
     stopLessonPlay();
     current = id; view = "game"; session = fresh();
     if (CHAL_BY_ID[id]) { curSkill = CHAL_BY_ID[id].skill; if (forceLesson || !state.lessons[id]) session.stage = "learn"; }
+    if (TRAIL_BY_ID[id]) { curSkill = "javascript"; session.stage = "learn"; }
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
-  function go(where) { stopLessonPlay(); if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  var LAB_VIEWS = ["lab", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
+  function unmountMiniGames() { if (window.XPMiniGames) window.XPMiniGames.stop(); }
+  var MINI_GAME_VIEWS = ["minigame-truth", "minigame-memory", "minigame-gitline", "minigame-kebab"];
+  var MINI_BEST_KEY = { truth: "truthBest", gitline: "gitlineBest", kebab: "kebabBest" };
+  function memoryBestKey(diff) {
+    return diff === "easy" ? "memoryBestEasy" : (diff === "hard" ? "memoryBestHard" : "memoryBestMedium");
+  }
+  function ensureMiniGames() { if (!state.minigames) state.minigames = { matchBest: 0, truthBest: 0, bracketBest: 0, memoryBestEasy: 0, memoryBestMedium: 0, memoryBestHard: 0, gitlineBest: 0, kebabBest: 0, statusBest: 0, xpBanked: 0 }; }
+  function awardMiniGameXp(amount, message) {
+    var n = Math.max(0, Math.min(500, Math.floor(Number(amount)) || 0));
+    if (!n) return;
+    state.xp += n;
+    ensureMiniGames();
+    state.minigames.xpBanked = (state.minigames.xpBanked || 0) + n;
+    save();
+    syncAccountUi();
+    if (message) say(message);
+  }
+  function go(where) {
+    stopLessonPlay();
+    if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home";
+    if (MINI_GAME_VIEWS.indexOf(view) >= 0) { unmountMiniGames(); root.removeAttribute("data-mini"); }
+    view = where; current = null; hint = false;
+    if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; }
+    draw(); window.scrollTo({ top: 0, behavior: "smooth" });
+  }
   function draw() {
-    if (view === "home") { label.textContent = "Home"; home(); if (LAB_ENABLED) root.insertAdjacentHTML("afterbegin", dailyBanner()); }
+    if (view === "home") { label.textContent = "Home"; home(); }
     else if (view === "map") { label.textContent = "Game Map"; track === "tech" ? techMap() : map(); }
     else if (view === "techskill") { label.textContent = "Game Map · " + SKILL_BY_ID[curSkill].name; techSkillPage(); }
     else if (view === "leaderboard") { label.textContent = "Leaderboard"; leaderboardPage(); }
-    else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
+    else if (view === "achievements") { label.textContent = "Achievements"; achievementsPage(); }
+    else if (view === "stats") { label.textContent = "Progress"; stats(); }
+    else if (view === "minigames") { label.textContent = "Mini games"; miniGamesPage(); }
+    else if (view === "minigame-truth") { label.textContent = "Mini games · Truth Rush"; miniTruthPage(); }
+    else if (view === "minigame-memory") { label.textContent = "Mini games · Status Pair Hunt"; miniMemoryPage(); }
+    else if (view === "minigame-gitline") { label.textContent = "Mini games · Git Line-up"; miniGitLinePage(); }
+    else if (view === "minigame-kebab") { label.textContent = "Mini games · Kebab Kanon"; miniKebabPage(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
-    else if (view === "anim") { label.textContent = "Animated"; animatedPage(); }
-    else if (view === "dsa") { label.textContent = "Animated · DSA"; dsaPage(); }
-    else if (view === "sort") { label.textContent = "Animated · DSA · Bubble Sort"; sortPage(); }
-    else if (view === "search") { label.textContent = "Animated · DSA · Binary Search"; searchPage(); }
+    else if (view === "anim") { label.textContent = "Play Lab"; animatedPage(); }
+    else if (view === "dsa") { label.textContent = "Play Lab · DSA"; dsaPage(); }
+    else if (view === "sort") { label.textContent = "Play Lab · DSA · Bubble Sort"; sortPage(); }
+    else if (view === "search") { label.textContent = "Play Lab · DSA · Binary Search"; searchPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
-    else if (AI && AI.VIEWS.indexOf(view) >= 0) { label.textContent = AI.label(view); AI.render(view); }
-    else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill" || (AI && AI.MAP_VIEWS.indexOf(view) >= 0)) && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && (["dsa", "sort", "search"].indexOf(view) >= 0 || (AI && AI.ANIM_VIEWS.indexOf(view) >= 0)))); });
+    else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || TRAIL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search"].indexOf(view) >= 0)); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (view === "search") mountSearchLab(); else if (window.XPBinarySearch) window.XPBinarySearch.unmount();
-    syncAccountUi();
-    var sound = document.querySelector("[data-action='sound']");
-    if (sound) { sound.textContent = state.sound ? "🔊 Sound on" : "🔈 Sound off"; sound.setAttribute("aria-pressed", String(state.sound)); }
+    if (MINI_GAME_VIEWS.indexOf(view) < 0) { unmountMiniGames(); root.removeAttribute("data-mini"); }
+    syncAccountUi(); syncDailyTaskbar();
   }
   function skillRow(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT);
@@ -293,55 +401,174 @@
     root.innerHTML =
       '<section class="dev-welcome"><div class="dev-wave">👋</div><div class="dev-welcome-copy"><span class="dev-eyebrow">SOFT SKILLS</span><h1>Hey ' + esc(state.name) + '! Ready to practice a real-life moment?</h1><p>Short scenarios that build the people skills great teams run on.</p></div><div class="dev-top-stats"><span class="dev-chip xp-chip">⚡ ' + state.xp + ' XP</span><span class="dev-chip">🏅 Level ' + pl.n + ' · ' + esc(pl.name) + '</span></div></section>' +
       '<section class="dev-hero"><div class="dev-hero-copy"><span class="dev-hero-tag">💬 NEXT UP · ' + esc(next.title.toUpperCase()) + '</span><h2>What would you do<br>in this moment?</h2><p>Read a short workplace scenario and choose the approach that feels like you. There are no wrong answers. Each choice builds different skills.</p><button class="primary-button dev-play-button" data-action="continue">Play next scenario →</button></div><div class="dev-hero-art"><div class="dev-orbit"></div><div class="dev-mascot">🦊</div><div class="dev-speech">Pip: how would that land?</div><span class="dev-float f1">✨ ' + done + '/' + total + ' played</span><span class="dev-float f2">+ XP</span></div></section>' +
-      '<section class="dev-bottom-grid"><div class="dev-panel"><div class="dev-panel-head"><h3>🧠 Your skills</h3><button class="dev-link" data-nav="map">See all →</button></div>' + SKILLS.map(skillRow).join("") + '</div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>💻 Technical Skills · 🤖 AI Code Check</h3><p>Game-style challenges in HTML, CSS and JavaScript, plus AI Code Check: read AI-written code and check it against the ticket.</p><div class="teaser-actions"><button class="secondary-button" data-action="tech">Technical Skills →</button>' + (AI ? '<button class="secondary-button" data-ai-open="map">AI Code Check →</button>' : "") + '</div></div></section>';
+      '<section class="dev-bottom-grid home-teasers"><div class="dev-panel teaser-panel"><span class="dev-eyebrow">PLAY LAB</span><h3>🧮 Watch algorithms move</h3><p>Step through Bubble Sort and Binary Search with the real code beside the animation.</p><button class="secondary-button" data-nav="anim">Open Play Lab →</button></div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>💻 Technical Skills</h3><p>Game-style challenges in HTML, CSS and JavaScript. Earn XP for every one you crack.</p><button class="secondary-button" data-action="tech">Open Technical Skills →</button></div></section>';
   }
   function trackTabs(active) {
-    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button>' + (AI ? '<button class="track-tab ' + (active === "ai" ? "is-active" : "") + '" data-ai-open="map">AI Code Check</button>' : "") + '</div>';
+    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button></div>';
   }
+  var SOFT_CARD_ACCENTS = {
+    leadership: "sk-tech-card--leadership", communication: "sk-tech-card--communication", "problem-solving": "sk-tech-card--problem",
+    collaboration: "sk-tech-card--collaboration", "time-management": "sk-tech-card--time", "decision-making": "sk-tech-card--decision"
+  };
   function skillCard(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT), list = SCEN.filter(function(x) { return x.skill === k.id; }), done = list.filter(function(x) { return played(x.id); }).length;
-    return '<button type="button" class="sk-card" data-skill="' + k.id + '"><span class="sk-card-top"><span class="sk-icon">' + skillIcon(k.id) + '</span><span class="sk-level">LEVEL ' + info.n + '</span></span><strong>' + esc(k.name) + '</strong><span class="sk-desc">' + esc(k.desc) + '</span>' +
-      '<span class="sk-card-foot"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></span><span class="sk-bar"><i style="width:' + info.pct + '%"></i></span><span class="sk-played">' + done + ' of ' + list.length + ' scenarios played</span></button>';
+    var accent = SOFT_CARD_ACCENTS[k.id] || "sk-tech-card--leadership";
+    return '<button type="button" class="sk-tech-card ' + accent + '" data-skill="' + k.id + '"><span class="sk-tech-card-shine" aria-hidden="true"></span>' +
+      '<span class="sk-tech-card-top"><span class="sk-tech-icon">' + skillIcon(k.id) + '</span><span class="sk-tech-level">Level ' + info.n + '</span></span>' +
+      '<strong class="sk-tech-title">' + esc(k.name) + '</strong><span class="sk-tech-desc">' + esc(k.desc) + '</span>' +
+      '<span class="sk-tech-tags"><span class="sk-tech-tag">Scenarios ×' + list.length + '</span><span class="sk-tech-tag">No wrong answers</span></span>' +
+      '<div class="sk-tech-progress"><div class="sk-tech-progress-row"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : info.next + " XP to next level") + '</span></div>' +
+      '<span class="sk-bar sk-tech-bar"><i style="width:' + info.pct + '%"></i></span></div>' +
+      '<span class="sk-tech-foot">' + done + " / " + list.length + ' scenarios played</span><span class="sk-tech-cta">Pick scenario →</span></button>';
   }
-  function capabilityPage(tab, description, cards, cta, note) {
-    var pl = playerLevel();
-    return '<div class="sk"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Game Map</h1><p>' + description + '</p></div>' + trackTabs(tab) + '</section>' +
-      '<section class="sk-player"><div class="sk-player-level"><span class="sk-eyebrow">PLAYER LEVEL</span><strong>' + pl.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>Level ' + pl.n + ' — ' + esc(pl.name) + '</h2><span>' + state.xp + (pl.next === null ? " XP" : " / " + pl.next + " XP") + '</span></div>' +
+  var TECH_KIND_LABELS = { tapLine: "Tap the bug", arrange: "Ordering", match: "Matching", fill: "Fill-in", live: "Live CSS", run: "Code runner" };
+  function capabilityPage(tab, description, cards, cta, note, gridClass) {
+    var pl = playerLevel(), grid = gridClass || "sk-tech-grid", wrap = " sk-tech-map";
+    return '<div class="sk' + wrap + '"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Game Map</h1><p>' + description + '</p></div>' + trackTabs(tab) + '</section>' +
+      '<section class="sk-player sk-player-tech"><div class="sk-player-level"><span class="sk-eyebrow">PLAYER LEVEL</span><strong>' + pl.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>Level ' + pl.n + ' — ' + esc(pl.name) + '</h2><span>' + state.xp + (pl.next === null ? " XP" : " / " + pl.next + " XP") + '</span></div>' +
       '<div class="sk-bar" role="progressbar" aria-label="Progress to the next player level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pl.pct + '"><i style="width:' + pl.pct + '%"></i></div><p>' + esc(pl.blurb) + '</p></div></section>' +
-      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">INDIVIDUAL PROGRESSION</span><h2>' + (tab === "tech" ? "Technical Skill Levels" : "Skill Levels") + '</h2></div><button class="primary-button" data-action="' + cta[0] + '">' + cta[1] + '</button></div><div class="sk-grid">' + cards + '</div><p class="sk-note">' + note + '</p></section></div>';
+      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">INDIVIDUAL PROGRESSION</span><h2>' + (tab === "tech" ? "Technical Skill Levels" : "Skill Levels") + '</h2></div><button class="primary-button" data-action="' + cta[0] + '">' + cta[1] + '</button></div><div class="' + grid + '">' + cards + '</div><p class="sk-note">' + note + '</p></section></div>';
   }
   function map() {
     var done = SCEN.filter(function(x) { return played(x.id); }).length;
     root.innerHTML = capabilityPage("core", "Your professional skills grow independently as you complete relevant scenarios.", SKILLS.map(skillCard).join(""), ["continue", "Play next scenario →"],
-      'Pick a skill to practise it. There are no right or wrong answers: each choice builds the skills it shows. ' + done + ' of ' + SCEN.length + ' scenarios played.');
+      'Pick a skill to practise it. There are no right or wrong answers: each choice builds the skills it shows. ' + done + ' of ' + SCEN.length + ' scenarios played.', "sk-tech-grid sk-soft-grid");
   }
   function techCard(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT), list = CHAL.filter(function(x) { return x.skill === k.id; }), done = list.filter(function(x) { return techDone(x.id); }).length;
-    return '<button type="button" class="sk-card" data-tech="' + k.id + '"><span class="sk-card-top"><span class="sk-icon">' + skillIcon(k.id) + '</span><span class="sk-level">LEVEL ' + info.n + '</span></span><strong>' + esc(k.name) + '</strong><span class="sk-desc">' + esc(k.desc) + '</span>' +
-      '<span class="sk-card-foot"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></span><span class="sk-bar"><i style="width:' + info.pct + '%"></i></span><span class="sk-played">' + done + ' of ' + list.length + ' challenges cleared</span></button>';
+    var kinds = {}, tags = [];
+    list.forEach(function(c) { kinds[c.kind] = (kinds[c.kind] || 0) + 1; });
+    Object.keys(kinds).forEach(function(kind) { tags.push('<span class="sk-tech-tag">' + esc(TECH_KIND_LABELS[kind] || kind) + " ×" + kinds[kind] + "</span>"); });
+    var accent = k.id === "html" ? "sk-tech-card--html" : (k.id === "css" ? "sk-tech-card--css" : "sk-tech-card--js");
+    return '<button type="button" class="sk-tech-card ' + accent + '" data-tech="' + k.id + '"><span class="sk-tech-card-shine" aria-hidden="true"></span>' +
+      '<span class="sk-tech-card-top"><span class="sk-tech-icon">' + skillIcon(k.id) + '</span><span class="sk-tech-level">Level ' + info.n + '</span></span>' +
+      '<strong class="sk-tech-title">' + esc(k.name) + '</strong><span class="sk-tech-desc">' + esc(k.desc) + '</span>' +
+      '<span class="sk-tech-tags">' + tags.join("") + '</span>' +
+      '<div class="sk-tech-progress"><div class="sk-tech-progress-row"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : info.next + " XP to next level") + '</span></div>' +
+      '<span class="sk-bar sk-tech-bar"><i style="width:' + info.pct + '%"></i></span></div>' +
+      '<span class="sk-tech-foot">' + done + " / " + list.length + ' challenges cleared</span><span class="sk-tech-cta">Open path →</span></button>';
   }
   function techMap() {
     var done = CHAL.filter(function(x) { return techDone(x.id); }).length;
     root.innerHTML = capabilityPage("tech", "Sharpen your front-end skills with quick, game-style challenges.", TECH.map(techCard).join(""), ["continue-tech", "Play next challenge →"],
-      'Pick a skill to start a challenge. Score 60% or more to clear it, and improve your best score to earn the rest of its XP. ' + done + ' of ' + CHAL.length + ' challenges cleared.');
+      'Pick a skill to start a challenge. Score 60% or more to clear it, and improve your best score to earn the rest of its XP. ' + done + ' of ' + CHAL.length + ' challenges cleared.', "sk-tech-grid");
+  }
+  function miniGamesPage() {
+    ensureMiniGames();
+    var mg = state.minigames;
+    root.removeAttribute("data-mini");
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ARCADE</span><h1>Mini games 🕹️</h1><p>Short skill drills disguised as arcade breaks. Score, streak, and bank XP — no lecture walls.</p></div></section>' +
+      '<div class="mg-hub-grid">' +
+      '<button type="button" class="mg-card mg-card--truth" data-nav="minigame-truth"><span class="mg-card-shine"></span><span class="mg-card-icon">⚡</span><span class="mg-card-tag">QUIZ RUSH</span><strong>Truth Rush</strong><small>True or false on a timer. Streak for bonus points — read fast, decide faster.</small><span class="mg-card-go">Best score: ' + (mg.truthBest || 0) + ' · Play →</span></button>' +
+      '<button type="button" class="mg-card mg-card--memory" data-nav="minigame-memory"><span class="mg-card-shine"></span><span class="mg-card-icon">🌐</span><span class="mg-card-tag">MEMORY</span><strong>Status Pair Hunt</strong><small>Match HTTP codes to their meanings — easy, medium, or hard grid.</small><span class="mg-card-go">Best hard: ' + (mg.memoryBestHard || 0) + ' · Play →</span></button>' +
+      '<button type="button" class="mg-card mg-card--gitline" data-nav="minigame-gitline"><span class="mg-card-shine"></span><span class="mg-card-icon">🚂</span><span class="mg-card-tag">PUZZLE</span><strong>Git Line-up</strong><small>Order Git, HTML, and CSS steps — swap lines, then Ship it.</small><span class="mg-card-go">Best score: ' + (mg.gitlineBest || 0) + ' · Play →</span></button>' +
+      '<button type="button" class="mg-card mg-card--kebab" data-nav="minigame-kebab"><span class="mg-card-shine"></span><span class="mg-card-icon">🎯</span><span class="mg-card-tag">NAMING</span><strong>Kebab Kanon</strong><small>Context says CSS, JS, JSON, or Git — pick the spelling that actually belongs there.</small><span class="mg-card-go">Best score: ' + (mg.kebabBest || 0) + ' · Play →</span></button>' +
+      '</div><section class="lab-footer-tip"><span>🎮</span><p><b>Original XPedition arcade.</b> Built for quick reps, not copy-paste classics.</p></section>';
+  }
+  function miniGameCallbacks(kind) {
+    ensureMiniGames();
+    var paid = false;
+    return {
+      best: state.minigames[MINI_BEST_KEY[kind] || "truthBest"] || 0,
+      onBest: function(score) {
+        var k = MINI_BEST_KEY[kind] || "truthBest";
+        state.minigames[k] = Math.max(state.minigames[k] || 0, score);
+        save();
+      },
+      onEnd: function(result) {
+        if (paid || !result || !result.xp) return;
+        paid = true;
+        awardMiniGameXp(result.xp, "Nice run! +" + result.xp + " XP from mini games.");
+      }
+    };
+  }
+  function miniTruthPage() {
+    if (root.dataset.mini === "truth" && root.querySelector("#mg-truth-q")) return;
+    root.dataset.mini = "truth";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) window.XPMiniGames.mountTruth(host, miniGameCallbacks("truth"));
+    else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
+  }
+  function miniMemoryPage() {
+    if (root.dataset.mini === "memory" && (root.querySelector("#mg-memory-grid") || root.querySelector("#mg-memory-picker"))) return;
+    root.dataset.mini = "memory";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) {
+      var paid = false;
+      window.XPMiniGames.mountMemory(host, {
+        getBest: function(diff) { ensureMiniGames(); return state.minigames[memoryBestKey(diff)] || 0; },
+        onBest: function(diff, score) {
+          ensureMiniGames();
+          var k = memoryBestKey(diff);
+          state.minigames[k] = Math.max(state.minigames[k] || 0, score);
+          save();
+        },
+        onEnd: function(result) {
+          if (paid || !result || !result.xp) return;
+          paid = true;
+          awardMiniGameXp(result.xp, "Nice run! +" + result.xp + " XP from mini games.");
+        }
+      });
+    } else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
+  }
+  function miniGitLinePage() {
+    if (root.dataset.mini === "gitline" && root.querySelector("#mg-gitline-list")) return;
+    root.dataset.mini = "gitline";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) window.XPMiniGames.mountGitLine(host, miniGameCallbacks("gitline"));
+    else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
+  }
+  function miniKebabPage() {
+    if (root.dataset.mini === "kebab" && root.querySelector("#mg-kebab-choices")) return;
+    root.dataset.mini = "kebab";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) window.XPMiniGames.mountKebab(host, miniGameCallbacks("kebab"));
+    else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
   }
   function stats() {
     var pl = playerLevel(), list = SCEN.filter(function(x) { return played(x.id); }), top = SKILLS.slice().sort(function(a, b) { return state.skills[b.id] - state.skills[a.id]; })[0];
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR SCOREBOARD</span><h1>Nice work, ' + esc(state.name) + ' ✨</h1><p>Stats track practice. They’re not a work-performance score.</p></div><button class="secondary-button" data-action="reset">Reset progress</button></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">YOUR PROGRESS</span><h1>Nice work, ' + esc(state.name) + ' ✨</h1><p>Stats track practice. They’re not a work-performance score.</p></div><button class="secondary-button" data-action="settings-ask-reset">Reset progress…</button></section>' +
       '<section class="dev-stats-hero"><div><span class="dev-rank-pill">🏅 ' + esc(pl.name) + '</span><h2>' + state.xp + ' <small>XP</small></h2><p>Keep exploring different approaches. Every choice builds something.</p></div><div class="dev-stat-stack"><div><strong>🏅 ' + pl.n + '</strong><span>player level</span></div><div><strong>🎯 ' + list.length + '/' + SCEN.length + '</strong><span>scenarios played</span></div><div><strong>⭐ ' + (state.skills[top.id] ? esc(top.name) : "—") + '</strong><span>top skill</span></div></div></section>' +
       '<div class="dev-stats-grid"><section class="dev-panel"><div class="dev-panel-head"><h3>🧠 Skill levels</h3><span>XP by skill</span></div>' + SKILLS.map(skillRow).join("") + '<div class="dev-panel-head sk-subhead"><h3>💻 Technical skills</h3></div>' + TECH.map(skillRow).join("") + '</section>' +
       '<section class="dev-panel"><div class="dev-panel-head"><h3>🗒️ Recent scenarios</h3><span>Your approach</span></div>' + (list.length ? list.slice(-6).reverse().map(function(x) { return '<div class="score-row"><span>' + esc(x.title) + '</span><b>' + String.fromCharCode(65 + state.scenarios[x.id]) + '</b></div>'; }).join("") : '<p class="dev-muted">Play a scenario and your choices show up here.</p>') + '</section></div><p class="dev-fineprint">All progress stays in this browser unless you sign in to a local account.</p>';
   }
-  var DAILY_TASKS = [
+  var DAILY_LAB_TASKS = [
     ["mission", "🎮", "Play a skill mission", "Any code challenge counts."],
     ["reel", "📼", "Watch a knowledge reel", "Flip a card and get its quick check right."],
     ["sim", "🎭", "Finish the workplace story", "Make three calls in the live scenario."]
   ];
-  function dailyCount() { ensureDaily(); return DAILY_TASKS.filter(function(t) { return has(state.daily.actions, t[0]); }).length; }
+  var DAILY_MAIN_TASKS = [
+    ["mission", "🎮", "Complete a task", "Play a soft-skill scenario or technical challenge."],
+    ["learn", "📖", "Finish a lesson", "Complete an interactive concept lesson (+10 XP)."],
+    ["clear", "⭐", "Clear a challenge", "Score 60% or higher on a technical challenge."]
+  ];
+  function dailyTaskDefs() { return LAB_ENABLED ? DAILY_LAB_TASKS : DAILY_MAIN_TASKS; }
+  function dailyCount() { ensureDaily(); return dailyTaskDefs().filter(function(t) { return has(state.daily.actions, t[0]); }).length; }
   function trackDaily(id) { ensureDaily(); if (!has(state.daily.actions, id)) state.daily.actions.push(id); }
+  function dailyTaskDest(id) {
+    if (LAB_ENABLED) return id === "mission" ? "map" : (id === "reel" ? "reels" : "sim");
+    track = id === "mission" ? track : "tech";
+    return "map";
+  }
+  function syncDailyTaskbar() {
+    var bar = document.getElementById("daily-taskbar"), shell = document.querySelector(".app-shell");
+    if (!bar) return;
+    if (!shell || shell.hidden || document.body.classList.contains("auth-locked")) { bar.hidden = true; bar.innerHTML = ""; return; }
+    ensureDaily();
+    var tasks = dailyTaskDefs(), total = tasks.length, n = dailyCount(), done = n === total;
+    bar.hidden = false;
+    bar.innerHTML = '<div class="daily-taskbar-inner"><span class="daily-taskbar-label">🗓️ DAILY · ' + esc(state.daily.date) + '</span><div class="daily-taskbar-chips">' +
+      tasks.map(function(t) { var yes = has(state.daily.actions, t[0]); return '<span class="daily-taskbar-chip' + (yes ? " done" : "") + '" title="' + esc(t[3]) + '">' + t[1] + " " + esc(t[2]) + (yes ? " ✓" : "") + "</span>"; }).join("") +
+      '</div><span class="daily-taskbar-progress" role="progressbar" aria-valuenow="' + Math.round(n / total * 100) + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + Math.round(n / total * 100) + '%"></i></span>' +
+      '<button type="button" class="daily-taskbar-claim" data-action="claim-daily"' + (!done || state.daily.claimed ? " disabled" : "") + ">" + (state.daily.claimed ? "Claimed ✓" : (done ? "Claim +80 XP" : n + "/" + total)) + '</button><button type="button" class="daily-taskbar-more" data-nav="daily">Details →</button></div>';
+  }
   function dailyBanner() {
-    var n = dailyCount();
-    return '<button class="dev-daily-banner" data-module="daily"><span class="daily-banner-icon">🗓️</span><span class="daily-banner-copy"><strong>Today’s tiny quest</strong><small>' + n + '/3 done · mission + reel + story</small></span><span class="daily-banner-progress"><i style="width:' + Math.round(n / 3 * 100) + '%"></i></span><b>' + (state.daily.claimed ? '🎉 Claimed' : (n === 3 ? '+80 XP' : 'Let’s go →')) + '</b></button>';
+    var n = dailyCount(), total = dailyTaskDefs().length;
+    return '<button class="dev-daily-banner" data-nav="daily"><span class="daily-banner-icon">🗓️</span><span class="daily-banner-copy"><strong>Today’s tiny quest</strong><small>' + n + "/" + total + ' done · +80 XP bonus</small></span><span class="daily-banner-progress"><i style="width:' + Math.round(n / total * 100) + '%"></i></span><b>' + (state.daily.claimed ? "🎉 Claimed" : (n === total ? "+80 XP" : "Let’s go →")) + "</b></button>";
   }
   function moduleCard(id, icon, title, tag, desc, status) {
     return '<button class="lab-module-card ' + id + '-module" data-module="' + id + '"><span class="lab-module-icon">' + icon + '</span><span class="lab-module-tag">' + tag + '</span><strong>' + title + '</strong><small>' + desc + '</small><span class="lab-module-go">' + status + ' →</span></button>';
@@ -363,18 +590,16 @@
   ];
   function algosDone() { return ALGOS.filter(function(a) { return a.done(); }).length; }
   function animatedPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Animated 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
-      '<div class="lab-module-grid">' + moduleCard("dsa", "🧮", "DSA", "DATA STRUCTURES & ALGORITHMS", "Step through classic algorithms with the real code beside the animation.", algosDone() + " of " + ALGOS.length + " completed") +
-      (AI ? moduleCard("jstrail", "🌈", "JavaScript Trail", "12 TINY MOVIES", "Follow Pip through JavaScript one animated idea at a time. +20 XP per lesson.", (state.jsLessons || []).length + " of " + AI.lessonCount() + " watched") +
-        moduleCard("visuals", "🦊", "Pip’s Code Explainers", AI.explainerCount() + " ANIMATED CONCEPTS", "See the idea behind each AI Code Check game come alive, step by step.", "Play any of them") : "") + '</div>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Play Lab 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
+      '<div class="lab-module-grid">' + moduleCard("dsa", "🧮", "DSA", "DATA STRUCTURES & ALGORITHMS", "Step through classic algorithms with the real code beside the animation.", algosDone() + " of " + ALGOS.length + " completed") + '</div>' +
       '<section class="lab-footer-tip"><span>💡</span><p><b>More topics are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
   }
   function dsaPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED</span><h1>DSA 🧮</h1><p>Pick an algorithm and watch it work. Each one earns +40 XP the first time you finish it.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section>' +
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB</span><h1>DSA 🧮</h1><p>Pick an algorithm and watch it work. Each one earns +40 XP the first time you finish it.</p></div><button class="dev-link" data-nav="anim">← Play Lab</button></section>' +
       '<div class="lab-module-grid">' + ALGOS.map(function(a) { return moduleCard(a.view, a.icon, a.title, a.tag, a.desc, a.done() ? "Completed ✓" : "Start · +40 XP"); }).join("") + '</div>';
   }
   function searchPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Binary Search 🔎</h1><p>Pick a target, then step through or play. Finish one search to earn XP and the Search Savant badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="binary-search-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Binary Search 🔎</h1><p>Pick a target, then step through or play. Finish one search to earn XP and the Search Savant badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="binary-search-host"></div>';
   }
   function mountSearchLab() {
     var host = document.getElementById("binary-search-host");
@@ -388,7 +613,7 @@
     return { message: "🎉 " + (result.found ? "Found it" : "Ruled it out") + " in " + result.steps + " step" + (result.steps === 1 ? "" : "s") + ". +40 XP and the Search Savant badge!" };
   }
   function sortPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Bubble Sort 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="bubble-sort-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Bubble Sort 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="bubble-sort-host"></div>';
   }
   function mountSortLab() {
     var host = document.getElementById("bubble-sort-host");
@@ -402,11 +627,11 @@
     return { message: "🎉 You watched all " + result.comparisons + " comparisons and " + result.swaps + " swaps. +40 XP and the Sort Sprinter badge!" };
   }
   function dailyPage() {
-    var n = dailyCount(), done = n === DAILY_TASKS.length;
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">FRESH CHECKLIST · ' + esc(state.daily.date) + '</span><h1>Today’s tiny quest 🗓️</h1><p>Three small actions. Your streak grows one good day at a time.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section>' +
-      '<section class="daily-hero"><div class="daily-sun">🌞</div><div><span class="dev-eyebrow">PIP’S DAILY DASH</span><h2>' + n + ' / 3 little wins</h2><p>Complete all three, then open your +80 XP reward.</p><div class="daily-big-track"><i style="width:' + Math.round(n / 3 * 100) + '%"></i></div></div><div class="daily-stamp">' + (state.daily.claimed ? '🎁<small>CLAIMED</small>' : (done ? '🎁<small>READY!</small>' : '✨<small>IN PROGRESS</small>')) + '</div></section>' +
-      '<div class="daily-task-list">' + DAILY_TASKS.map(function(t) { var yes = has(state.daily.actions, t[0]); return '<div class="daily-task ' + (yes ? 'task-done' : '') + '"><span class="daily-task-icon">' + t[1] + '</span><div><strong>' + t[2] + '</strong><small>' + t[3] + '</small></div><span class="daily-task-state">' + (yes ? '✓ DONE' : 'NOT YET') + '</span><button class="secondary-button" data-module="' + (t[0] === 'mission' ? 'map' : (t[0] === 'reel' ? 'reels' : 'sim')) + '">' + (yes ? 'Again' : 'Go') + ' →</button></div>'; }).join('') + '</div>' +
-      '<div class="daily-reward-row"><span>🎁 Finish all 3 to claim</span><button class="primary-button" data-action="claim-daily"' + (!done || state.daily.claimed ? ' disabled' : '') + '>' + (state.daily.claimed ? 'Reward claimed ✓' : 'Claim +80 XP') + '</button></div>';
+    var tasks = dailyTaskDefs(), total = tasks.length, n = dailyCount(), done = n === total;
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">FRESH CHECKLIST · ' + esc(state.daily.date) + '</span><h1>Today’s tiny quest 🗓️</h1><p>Three small actions. Your streak grows one good day at a time.</p></div><button class="dev-link" data-nav="' + (LAB_ENABLED ? "lab" : "home") + '">← ' + (LAB_ENABLED ? "Play Lab" : "Home") + '</button></section>' +
+      '<section class="daily-hero"><div class="daily-sun">🌞</div><div><span class="dev-eyebrow">PIP’S DAILY DASH</span><h2>' + n + " / " + total + ' little wins</h2><p>Complete all three, then open your +80 XP reward.</p><div class="daily-big-track"><i style="width:' + Math.round(n / total * 100) + '%"></i></div></div><div class="daily-stamp">' + (state.daily.claimed ? '🎁<small>CLAIMED</small>' : (done ? '🎁<small>READY!</small>' : '✨<small>IN PROGRESS</small>')) + '</div></section>' +
+      '<div class="daily-task-list">' + tasks.map(function(t) { var yes = has(state.daily.actions, t[0]); return '<div class="daily-task ' + (yes ? 'task-done' : '') + '"><span class="daily-task-icon">' + t[1] + '</span><div><strong>' + t[2] + '</strong><small>' + t[3] + '</small></div><span class="daily-task-state">' + (yes ? '✓ DONE' : 'NOT YET') + '</span><button class="secondary-button" data-nav="' + dailyTaskDest(t[0]) + '">' + (yes ? 'Again' : 'Go') + ' →</button></div>'; }).join('') + '</div>' +
+      '<div class="daily-reward-row"><span>🎁 Finish all ' + total + ' to claim</span><button class="primary-button" data-action="claim-daily"' + (!done || state.daily.claimed ? ' disabled' : '') + '>' + (state.daily.claimed ? 'Reward claimed ✓' : 'Claim +80 XP') + '</button></div>';
   }
   function reelsPage() {
     var r = REELS[reelIndex], completed = has(state.reels, r.id), answered = reelAnswer !== null;
@@ -428,19 +653,36 @@
       (s.last ? '<div class="sim-last-feedback">💬 ' + esc(s.last) + '</div>' : '') +
       '<section class="sim-scene"><div class="sim-scene-person">' + (i === 0 ? '🧑‍💻' : (i === 1 ? '🧑‍🤝‍🧑' : '🦊')) + '</div><span class="dev-eyebrow">' + step.speaker + '</span><h2>' + step.text + '</h2><div class="sim-options">' + step.options.map(function(x, j) { return '<button class="sim-option" data-sim-choice="' + j + '"><span>' + String.fromCharCode(65 + j) + '</span>' + x + '<b>→</b></button>'; }).join('') + '</div><small class="sim-score-hint">Current team points: ' + s.score + ' · pick what you’d really do.</small></section>';
   }
-  function badgeList() {
+  function achievementList() {
     var anySkill = SKILLS.some(function(k) { return levelInfo(state.skills[k.id], SKILL_AT).n >= 2; });
+    var scenarios = Object.keys(state.scenarios).length;
+    var techCleared = CHAL.filter(function(c) { return techDone(c.id); }).length;
+    var firstTask = scenarios > 0 || CHAL.some(function(c) { return techBest(c.id) > 0; });
     return [
-      { icon: '🪄', title: 'First Spark', desc: 'Finish your first scenario.', unlocked: Object.keys(state.scenarios).length > 0 },
-      { icon: '🌈', title: 'Well-Rounded', desc: 'Earn XP in all six skills.', unlocked: SKILLS.every(function(k) { return state.skills[k.id] > 0; }) },
-      { icon: '💻', title: 'Tech Starter', desc: 'Clear your first technical challenge.', unlocked: CHAL.some(function(x) { return techDone(x.id); }) },
-      { icon: '🌱', title: 'Rising Skill', desc: 'Reach Level 2 in any skill.', unlocked: anySkill },
-      { icon: '📼', title: 'Pocket Professor', desc: 'Collect all three Knowledge Reels.', unlocked: state.reels.length >= REELS.length },
-      { icon: '🎭', title: 'Calm in the Chaos', desc: 'Finish the workplace simulator.', unlocked: state.simulator.done },
-      { icon: '🔎', title: 'Search Savant', desc: 'Finish a Binary Search.', unlocked: state.sortLab.binary.done },
-      { icon: '🫧', title: 'Sort Sprinter', desc: 'Watch the whole Bubble Sort Lab.', unlocked: state.sortLab.bubble.done },
-      { icon: '🎁', title: 'Daily Dynamo', desc: 'Claim the daily quest reward.', unlocked: state.daily.claimed }
+      { icon: "🎯", title: "First task complete", desc: "Finish your first scenario or technical challenge.", unlocked: firstTask },
+      { icon: "📖", title: "Concept collector", desc: "Complete your first interactive lesson.", unlocked: Object.keys(state.lessons).length > 0 },
+      { icon: "⚡", title: "XP spark", desc: "Earn 50 total XP.", unlocked: state.xp >= 50 },
+      { icon: "🏅", title: "Level 2 explorer", desc: "Reach player level 2.", unlocked: playerLevel().n >= 2 },
+      { icon: "💻", title: "Challenge cleared", desc: "Score 60% or higher on a technical challenge.", unlocked: techCleared > 0 },
+      { icon: "🗺️", title: "Map momentum", desc: "Clear 3 technical challenges.", unlocked: techCleared >= 3 },
+      { icon: "🪄", title: "First Spark", desc: "Finish your first soft-skill scenario.", unlocked: scenarios > 0 },
+      { icon: "🌈", title: "Well-Rounded", desc: "Earn XP in all six soft skills.", unlocked: SKILLS.every(function(k) { return state.skills[k.id] > 0; }) },
+      { icon: "🌱", title: "Rising Skill", desc: "Reach Level 2 in any skill.", unlocked: anySkill },
+      { icon: "🎁", title: "Daily Dynamo", desc: "Claim today’s daily quest reward.", unlocked: state.daily.claimed },
+      { icon: "📼", title: "Pocket Professor", desc: "Collect all three Knowledge Reels.", unlocked: state.reels.length >= REELS.length },
+      { icon: "🎭", title: "Calm in the Chaos", desc: "Finish the workplace simulator.", unlocked: state.simulator.done },
+      { icon: "🔎", title: "Search Savant", desc: "Finish a Binary Search lab.", unlocked: state.sortLab.binary.done },
+      { icon: "🫧", title: "Sort Sprinter", desc: "Watch the whole Bubble Sort lab.", unlocked: state.sortLab.bubble.done }
     ];
+  }
+  function achievementsPage() {
+    var list = achievementList(), unlocked = list.filter(function(a) { return a.unlocked; }).length;
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">MILESTONES</span><h1>Achievements 🏅</h1><p>' + unlocked + " of " + list.length + ' unlocked. Small wins add up across the Game Map and Play Lab.</p></div><button class="dev-link" data-nav="home">← Home</button></section><div class="badge-grid">' +
+      list.map(function(a) { return '<article class="badge-card ' + (a.unlocked ? "unlocked" : "locked") + '"><span>' + a.icon + '</span><strong>' + esc(a.title) + '</strong><small>' + esc(a.desc) + '</small><b>' + (a.unlocked ? "UNLOCKED ✓" : "LOCKED 🔒") + "</b></article>"; }).join("") + "</div>";
+  }
+  function badgeList() {
+    var titles = ["First Spark", "Well-Rounded", "Challenge cleared", "Rising Skill", "Pocket Professor", "Calm in the Chaos", "Search Savant", "Sort Sprinter", "Daily Dynamo"];
+    return achievementList().filter(function(a) { return titles.indexOf(a.title) >= 0; });
   }
   function badgesPage() {
     var list = badgeList(), unlocked = list.filter(function(b) { return b.unlocked; }).length;
@@ -456,7 +698,7 @@
   }
   function claimDaily() {
     if (state.daily.claimed) { say('You already claimed today’s reward.'); return; }
-    if (dailyCount() < DAILY_TASKS.length) { say('Finish all three little wins first.'); return; }
+    if (dailyCount() < dailyTaskDefs().length) { say("Finish all three little wins first."); return; }
     state.daily.claimed = true; state.xp += 80; save(); draw(); say('Daily quest complete! +80 XP');
   }
   function chooseSim(index) {
@@ -499,6 +741,22 @@
       var row = r.length === 3 && r.every(function(x) { return Math.abs(x.top - r[0].top) <= 1; }) && r[1].left > r[0].left && r[2].left > r[1].left;
       var gap = row && Math.abs(r[1].left - r[0].right - 16) <= 1 && Math.abs(r[2].left - r[1].right - 16) <= 1;
       return [{ label: "Cards sit side by side", ok: !!row }, { label: "16px gap between the cards", ok: !!gap }];
+    },
+    "column-stack": function(doc) {
+      var r = [].map.call(doc.querySelectorAll(".card"), function(el) { return el.getBoundingClientRect(); });
+      var stacked = r.length >= 2 && r[1].top >= r[0].bottom - 2 && Math.abs(r[0].left - r[1].left) <= 2;
+      var gap = stacked && Math.abs(r[1].top - r[0].bottom - 12) <= 2;
+      return [{ label: "Cards stack vertically", ok: !!stacked }, { label: "12px gap between cards", ok: !!gap }];
+    },
+    "bold-heading": function(doc) {
+      var h = doc.querySelector(".hero");
+      if (!h) return [{ label: "Heading is bold", ok: false }, { label: "Heading uses coral color", ok: false }];
+      var style = doc.defaultView.getComputedStyle(h);
+      var weight = parseInt(style.fontWeight, 10);
+      var bold = weight >= 600 || style.fontWeight === "bold";
+      var rgb = style.color.match(/\d+/g) || [];
+      var coral = rgb.length >= 3 && Math.abs(+rgb[0] - 244) <= 25 && Math.abs(+rgb[1] - 123) <= 25 && Math.abs(+rgb[2] - 103) <= 25;
+      return [{ label: "Heading is bold", ok: bold }, { label: "Heading uses coral (#f47b67)", ok: coral }];
     }
   };
   function liveDoc(c, css) {
@@ -532,11 +790,10 @@
   /* ---- JavaScript tests run in a Web Worker with a time limit ---- */
   function runTests(c, code) {
     return new Promise(function(resolve) {
-      var src = "self.onmessage=function(e){var d=e.data;try{var fn=new Function(d.code+'\\n;return '+d.name+';')();if(typeof fn!=='function')throw new Error('Define a function named '+d.name);var rows=d.tests.map(function(t){try{var a=fn.apply(null,t.args);return{actual:a===undefined?'undefined':a,pass:JSON.stringify(a)===JSON.stringify(t.expected)}}catch(x){return{actual:String(x.message),pass:false}}});self.postMessage({rows:rows})}catch(x){self.postMessage({error:x.message})}};";
-      var url, worker, timeout;
-      function end(result) { clearTimeout(timeout); if (worker) worker.terminate(); if (url) URL.revokeObjectURL(url); resolve(result); }
+      var worker, timeout;
+      function end(result) { clearTimeout(timeout); if (worker) worker.terminate(); resolve(result); }
       try {
-        url = URL.createObjectURL(new Blob([src], { type: "text/javascript" })); worker = new Worker(url);
+        worker = new Worker("runner-worker.js");
         timeout = setTimeout(function() { end({ error: "That took too long. Check for an infinite loop." }); }, 1500);
         worker.onmessage = function(e) {
           if (e.data.error) { end({ error: e.data.error }); return; }
@@ -638,30 +895,45 @@
         (v.say ? '<p class="sk-say"><span>🔊 A screen reader says</span> ' + esc(v.say) + '</p>' : "") + '</div></div><p class="sk-learn-caption">' + esc(v.caption) + '</p><p class="sk-hint">' + (lessonDone(L) ? "You've seen every version." : "Tap each version to see the difference (" + session.seen.length + " of " + L.variants.length + ").") + '</p>';
     }
     var st = L.steps[Math.min(session.ls, L.steps.length - 1)], last = session.ls >= L.steps.length - 1;
+    var right = L.kind === "nodes"
+      ? '<div class="sk-learn-nodes">' + st.nodes.map(function(n, i) { return (i ? '<span class="sk-node-arrow" aria-hidden="true">➜</span>' : '') + '<div class="sk-node"><span>' + esc(n.icon) + '</span><strong>' + esc(n.title) + '</strong><small>' + esc(n.value) + '</small></div>'; }).join("") + '</div>'
+      : '<div class="sk-learn-state">' + st.state.map(function(row) { return '<div><small>' + esc(row[0]) + '</small><strong>' + esc(row[1]) + '</strong></div>'; }).join("") + '</div>';
+    var say = L.kind === "nodes" ? '<strong class="sk-learn-takeaway">' + esc(st.label) + ': ' + esc(st.takeaway) + '</strong><br>' + esc(st.caption) : esc(st.say);
     return '<div class="sk-learn-grid"><div class="sk-codelines sk-learn-lines">' + L.code.map(function(line, i) {
       return '<div class="sk-learnline ' + (has(st.focus, i) ? "focus" : "") + '"><span>' + (i + 1) + '</span><code>' + esc(line) + '</code></div>';
-    }).join("") + '</div><div class="sk-learn-state">' + st.state.map(function(row) { return '<div><small>' + esc(row[0]) + '</small><strong>' + esc(row[1]) + '</strong></div>'; }).join("") + '</div></div>' +
-      '<p class="sk-learn-caption" aria-live="polite">' + esc(st.say) + '</p><div class="sk-stepper"><button type="button" class="secondary-button" data-action="lesson-prev"' + (session.ls === 0 ? " disabled" : "") + '>← Back</button>' +
+    }).join("") + '</div>' + right + '</div>' +
+      '<p class="sk-learn-caption" aria-live="polite">' + say + '</p><div class="sk-stepper"><button type="button" class="secondary-button" data-action="lesson-prev"' + (session.ls === 0 ? " disabled" : "") + '>← Back</button>' +
       '<span class="sk-dots" aria-hidden="true">' + L.steps.map(function(_, i) { return '<i class="' + (i === session.ls ? "on" : (i < session.ls ? "past" : "")) + '"></i>'; }).join("") + '</span>' +
       '<button type="button" class="secondary-button" data-action="lesson-play">' + (lessonTimer ? "⏸ Pause" : "▶ Play") + '</button><button type="button" class="primary-button" data-action="lesson-next"' + (last ? " disabled" : "") + '>Next →</button></div><p class="sk-hint">Step ' + (session.ls + 1) + ' of ' + L.steps.length + '</p>';
   }
   function lessonScreen(c) {
     var L = LESSONS[c.id], learned = !!state.lessons[c.id], ready = lessonDone(L);
     root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="techskill">← Back to ' + esc(SKILL_BY_ID[c.skill].name) + '</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · LEARN FIRST</span><h1>📖 ' + esc(L.title) + '</h1><p class="sk-situation">' + esc(L.intro) + '</p>' + lessonBody(L) +
-      '<div class="sk-insight sk-key"><span class="sk-eyebrow">KEY IDEA</span><p>' + esc(L.key) + '</p></div><div class="sk-actions"><button type="button" class="primary-button" data-action="lesson-done"' + (ready ? "" : " disabled") + '>' + (learned ? "Start the challenge →" : "Got it — start the challenge →") + '</button><button type="button" class="secondary-button" data-action="lesson-skip">' + (learned ? "Skip" : "Skip lesson") + '</button></div>' +
-      (learned ? "" : '<p class="sk-hint">Finish the lesson to earn +10 ' + esc(SKILL_BY_ID[c.skill].name) + ' XP.</p>') + '</section></div>';
+      '<div class="sk-insight sk-key"><span class="sk-eyebrow">KEY IDEA</span><p>' + esc(L.key) + '</p></div><div class="sk-actions"><button type="button" class="primary-button" data-action="lesson-done"' + (ready ? "" : " disabled") + '>' + (c.trail ? (learned ? "Back to JavaScript →" : "Got it — back to JavaScript →") : (learned ? "Start the challenge →" : "Got it — start the challenge →")) + '</button><button type="button" class="secondary-button" data-action="lesson-skip">' + (learned ? "Skip" : "Skip lesson") + '</button></div>' +
+      (learned ? "" : '<p class="sk-hint">Finish the lesson to earn +10 XP in ' + esc(SKILL_BY_ID[c.skill].name) + ".</p>") + "</section></div>";
   }
   function completeLesson(c, skipped) {
     stopLessonPlay();
     if (!skipped && lessonDone(LESSONS[c.id]) && !state.lessons[c.id]) {
       var before = levelInfo(state.skills[c.skill], SKILL_AT).n, playerBefore = playerLevel().n;
-      state.lessons[c.id] = true; state.skills[c.skill] += 10; state.xp += 10;
-      var msg = "Concept learned! +10 " + SKILL_BY_ID[c.skill].name + " XP";
+      state.lessons[c.id] = true; state.skills[c.skill] += 10; state.xp += 10; trackDaily("learn");
+      var msg = "Concept learned! +10 XP · " + SKILL_BY_ID[c.skill].name;
       if (levelInfo(state.skills[c.skill], SKILL_AT).n > before) msg += " · " + SKILL_BY_ID[c.skill].name + " reached Level " + levelInfo(state.skills[c.skill], SKILL_AT).n;
       else if (playerLevel().n > playerBefore) msg += " · Player Level " + playerLevel().n + "!";
       save(); say(msg);
     }
+    if (c.trail) { go("techskill"); return; }
     session.stage = "play"; draw();
+  }
+  function trailSection(k) {
+    if (k.id !== "javascript" || !TRAIL.length) return "";
+    var learned = TRAIL.filter(function(t) { return state.lessons[t.id]; }).length;
+    return '<section class="sk-trail"><div class="sk-sec-head"><div><span class="sk-eyebrow">JAVASCRIPT LEARN TRAIL</span><h2>From first line to async</h2></div><span class="sk-trail-count">' + learned + ' of ' + TRAIL.length + ' learned</span></div>' +
+      TRAIL_WORLDS.map(function(w) {
+        return '<div class="sk-world"><h3>' + esc(w) + '</h3><div class="sk-world-grid">' + TRAIL.filter(function(t) { return t.world === w; }).map(function(t) {
+          return '<button type="button" class="sk-trailbtn' + (state.lessons[t.id] ? " done" : "") + '" data-lesson="' + t.id + '"><span aria-hidden="true">' + esc(t.icon) + '</span><strong>' + esc(t.title) + '</strong><small>' + (state.lessons[t.id] ? "✓ Learned" : "+10 XP") + '</small></button>';
+        }).join("") + '</div></div>';
+      }).join("") + '</section>';
   }
   function techSkillPage() {
     var k = SKILL_BY_ID[curSkill], info = levelInfo(state.skills[k.id], SKILL_AT), list = CHAL.filter(function(x) { return x.skill === k.id; });
@@ -669,7 +941,7 @@
     var kindLabel = { tapLine: "Tap the bugs", arrange: "Put in order", match: "Match pairs", fill: "Type it in", live: "Live CSS editor", run: "Code runner" };
     root.innerHTML = '<div class="sk"><button type="button" class="back-link" data-nav="map">← Back to Game Map</button><section class="sk-head"><div><span class="sk-eyebrow">TECHNICAL SKILL</span><h1>' + esc(k.name) + '</h1><p>' + esc(k.desc) + '</p></div><span class="sk-icon sk-icon-lg">' + skillIcon(k.id) + '</span></section>' +
       '<section class="sk-player"><div class="sk-player-level"><span class="sk-eyebrow">SKILL LEVEL</span><strong>' + info.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>' + state.skills[k.id] + ' XP</h2><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></div><div class="sk-bar" role="progressbar" aria-label="Progress to the next ' + esc(k.name) + ' level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + info.pct + '"><i style="width:' + info.pct + '%"></i></div><p>' + learnedCount + ' of ' + list.length + ' concepts learned · ' + cleared + ' of ' + list.length + ' challenges cleared</p></div></section>' +
-      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">LEARN, THEN PLAY</span><h2>Your ' + esc(k.name) + ' path</h2></div><button class="primary-button" data-action="continue-tech">Continue →</button></div><ol class="sk-path">' +
+      trailSection(k) + '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">LEARN, THEN PLAY</span><h2>Your ' + esc(k.name) + ' path</h2></div><button class="primary-button" data-action="continue-tech">Continue →</button></div><ol class="sk-path">' +
       list.map(function(c, i) {
         var L = LESSONS[c.id], learned = !!state.lessons[c.id], best = techBest(c.id);
         return '<li class="sk-pathrow"><span class="sk-pathnum">' + (i + 1) + '</span><div class="sk-pathbody"><button type="button" class="sk-pathbtn" data-lesson="' + c.id + '"><span class="sk-pathtag">' + (learned ? "✓ LEARNED" : "📖 LESSON") + '</span><strong>' + esc(L.title) + '</strong><small>' + (L.kind === "steps" ? "Step-by-step visual" : "Compare and explore") + '</small></button>' +
@@ -707,6 +979,7 @@
         if (playerLevel().n > playerBefore) levelUps.push("You reached Player Level " + playerLevel().n + " — " + playerLevel().name);
       }
       state.tech[c.id] = best; trackDaily("mission");
+      if (best >= 60 && old < 60) trackDaily("clear");
       session.result = { score: score, best: best, gain: gain, levelUps: levelUps, tests: res.tests, goals: res.goals };
       save();
       if (state.sound && score >= 60) beep();
@@ -715,6 +988,7 @@
   }
   function gameScreen() {
     if (CHAL_BY_ID[current]) { techScreen(CHAL_BY_ID[current]); return; }
+    if (TRAIL_BY_ID[current]) { lessonScreen(TRAIL_BY_ID[current]); return; }
     var sc = SCEN_BY_ID[current];
     if (!sc) { go("map"); return; }
     root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="map">← Back to Game Map</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[sc.skill].name.toUpperCase()) + ' · SCENARIO</span><h1>' + esc(sc.title) + '</h1><p class="sk-situation">' + esc(sc.situation) + '</p><h2 class="sk-question">' + esc(sc.question) + '</h2>' + (session.result ? resultCard(sc) : choiceCard(sc)) + '</section></div>';
@@ -745,25 +1019,69 @@
     if (!state.sound) return;
     try { var C = window.AudioContext || window.webkitAudioContext; if (!C) return; var c = new C(), o = c.createOscillator(), v = c.createGain(); o.frequency.value = 740; v.gain.value = .04; o.connect(v); v.connect(c.destination); o.start(); o.stop(c.currentTime + .12); setTimeout(function() { c.close(); }, 250); } catch (e) {}
   }
-  /* Shared by the AI Code Check module: adds XP to the player (and optionally a skill) and announces level-ups. */
-  function addXp(n, skill) {
-    var before = playerLevel().n;
-    state.xp += n; if (skill && state.skills[skill] !== undefined) state.skills[skill] += n;
-    save();
-    if (playerLevel().n > before) say("You reached Player Level " + playerLevel().n + " — " + playerLevel().name);
+  var settingsConfirm = null;
+  function segmented(name, value, options) {
+    return '<div class="settings-seg" role="radiogroup" aria-label="' + esc(name) + '">' + options.map(function(o) {
+      return '<button type="button" role="radio" aria-checked="' + (o[0] === value) + '" class="' + (o[0] === value ? "on" : "") + '" data-setting="' + esc(name) + '" data-value="' + o[0] + '">' + esc(o[1]) + '</button>';
+    }).join("") + '</div>';
+  }
+  function settingSwitch(name, on, label) {
+    return '<button type="button" class="settings-switch" role="switch" aria-checked="' + on + '" data-setting="' + name + '" data-value="' + (on ? "off" : "on") + '" aria-label="' + esc(label) + '"><span></span></button>';
+  }
+  function settingsRow(title, hint, control) { return '<div class="settings-row"><div><strong>' + title + '</strong>' + (hint ? '<small>' + hint + '</small>' : "") + '</div>' + control + '</div>'; }
+  function renderSettings() {
+    var modal = document.getElementById("account-modal-root"); if (!modal || !account) return;
+    var st = getSettings();
+    modal.innerHTML = '<div class="account-backdrop" role="presentation"><section class="account-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title"><button class="account-close" data-action="close-account" aria-label="Close">×</button><span class="account-kicker">APPLICATION SETTINGS</span><h2 id="settings-title">Settings</h2>' +
+      '<div class="settings-profile">' + avatarHtml("settings-avatar", account.avatar) + '<div><strong>' + esc(account.name) + '</strong><small>' + esc(account.email) + '</small><small>Level ' + currentLevel() + ' · ' + esc(playerLevel().name) + ' · ' + state.xp + ' XP</small></div><button type="button" class="secondary-button" data-action="profile">Edit profile</button></div>' +
+      '<h3 class="settings-head">Appearance</h3>' +
+      settingsRow("Theme", "", segmented("theme", themeChoice(), [["light", "Light"], ["dark", "Dark"], ["system", "System"]])) +
+      settingsRow("Text size", "Makes everything a little bigger.", segmented("textSize", st.textSize, [["normal", "Normal"], ["large", "Large"], ["larger", "Larger"]])) +
+      settingsRow("Reduce motion", "Turns off animations and transitions.", settingSwitch("motion", st.motion === "reduce", "Reduce motion")) +
+      '<h3 class="settings-head">Sound</h3>' +
+      settingsRow("Sound effects", "A small chime when you score well.", settingSwitch("sound", !!state.sound, "Sound effects")) +
+      '<h3 class="settings-head">Learning</h3>' +
+      settingsRow("Lesson autoplay speed", "How fast step-by-step lessons advance when you press Play.", segmented("lessonSpeed", st.lessonSpeed, [["slow", "Slow"], ["normal", "Normal"], ["fast", "Fast"]])) +
+      settingsRow("Game Map opens on", "", segmented("mapStart", st.mapStart, [["tech", "Technical"], ["core", "Soft skills"]])) +
+      '<h3 class="settings-head">Progress</h3>' +
+      settingsRow("Reset progress", "Clears your XP, skills and completed challenges. This can’t be undone.", settingsConfirm === "reset" ? '<div class="settings-confirm"><button type="button" class="settings-danger" data-action="reset">Yes, reset</button><button type="button" class="secondary-button" data-action="settings-cancel">Cancel</button></div>' : '<button type="button" class="secondary-button" data-action="settings-ask-reset">Reset…</button>') +
+      '<h3 class="settings-head">Account</h3>' +
+      '<div class="settings-actions"><button type="button" class="secondary-button" data-action="account-logout">Sign out</button><button type="button" class="secondary-button" data-action="logout-all">Sign out on all devices</button></div>' +
+      '</section></div>';
+  }
+  function changeSetting(key, value) {
+    if (key === "theme") setTheme(value);
+    else if (key === "sound") { state.sound = value === "on"; save(); if (state.sound) beep(); }
+    else if (key === "motion") setSetting("motion", value === "on" ? "reduce" : "system");
+    else setSetting(key, value);
+    renderSettings();
+    var focusTarget = document.querySelector('[data-setting="' + key + '"].on, [data-setting="' + key + '"][role="switch"]'); if (focusTarget) focusTarget.focus();
+  }
+  async function signOutEverywhere() {
+    try { await fetch("/api/logout-all", { method: "POST" }); } catch (e) {}
+    try { Object.keys(localStorage).forEach(function(k) { if (k.indexOf(BASE_KEY) === 0) localStorage.removeItem(k); }); } catch (e) {}
+    account = null; KEY = BASE_KEY; state = seed(); view = "home"; current = null;
+    renderAuth("login", "You’ve been signed out on every device.");
   }
   function reset() {
-    state = account ? freshAccount(account.name) : seed(); save(); go("home"); say("Fresh start! Pip is cheering you on.");
+    settingsConfirm = null; closeAccountModal();
+    state = freshAccount(account ? account.name : "Learner"); save(); go("home"); say("Fresh start! Your progress has been reset.");
   }
 
   document.addEventListener("click", function(e) {
     var brandLink = e.target.closest(".brand");
     if (brandLink) { var logo = brandLink.querySelector(".xp-logo"); if (logo) { logo.classList.remove("pop"); void logo.offsetWidth; logo.classList.add("pop"); setTimeout(function() { logo.classList.remove("pop"); }, 650); } }
+    var settingButton = e.target.closest("[data-setting]");
+    if (settingButton) { changeSetting(settingButton.dataset.setting, settingButton.dataset.value); return; }
+    var presetButton = e.target.closest("[data-preset]");
+    if (presetButton && profileDraft) { profileDraft.avatar = "preset:" + presetButton.dataset.preset; document.querySelectorAll("[data-preset]").forEach(function(b) { var on = b === presetButton; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); }); profilePreview(); return; }
     var accountModeButton = e.target.closest("[data-account-mode]");
-    if (accountModeButton) { renderAccountModal(accountModeButton.dataset.accountMode); return; }
+    if (accountModeButton) { renderAuth(accountModeButton.dataset.accountMode); return; }
     if (e.target.id === "account-modal-root" || e.target.classList.contains("account-backdrop")) { closeAccountModal(); return; }
+    var miniBack = e.target.closest("[data-mini-back]");
+    if (miniBack) { e.preventDefault(); go(miniBack.getAttribute("data-mini-back") || "minigames"); return; }
     var nav = e.target.closest("[data-nav]");
-    if (nav) { e.preventDefault(); go(nav.dataset.nav); return; }
+    if (nav) { e.preventDefault(); if (nav.dataset.nav === "map" && nav.closest(".sidebar")) track = getSettings().mapStart === "core" ? "core" : "tech"; go(nav.dataset.nav); return; }
     var moduleButton = e.target.closest("[data-module]");
     if (moduleButton) { e.preventDefault(); go(moduleButton.dataset.module); return; }
     var reelPick = e.target.closest("[data-reel-answer]");
@@ -779,10 +1097,14 @@
     var skillButton = e.target.closest("[data-skill]");
     if (skillButton) { open(nextScenario(skillButton.dataset.skill)); return; }
     var actionButton = e.target.closest("[data-action]"), action = actionButton && actionButton.dataset.action;
-    if (action === "theme") setTheme(currentTheme() === "dark" ? "light" : "dark");
+    if (action === "theme") { setTheme(currentTheme() === "dark" ? "light" : "dark"); var authTheme = document.querySelector(".auth-theme"); if (authTheme) authTheme.textContent = currentTheme() === "dark" ? "☀️" : "🌙"; }
     else if (action === "profile") renderProfileModal();
+    else if (action === "settings") { settingsConfirm = null; renderSettings(); }
+    else if (action === "settings-ask-reset") { settingsConfirm = "reset"; renderSettings(); }
+    else if (action === "settings-cancel") { settingsConfirm = null; renderSettings(); }
+    else if (action === "logout-all") signOutEverywhere();
     else if (action === "profile-photo") { var fileInput = document.getElementById("profile-file"); if (fileInput) fileInput.click(); }
-    else if (action === "profile-photo-remove") { if (profileDraft) { profileDraft.avatar = ""; profilePreview(); } }
+    else if (action === "profile-photo-remove") { if (profileDraft) { profileDraft.avatar = ""; document.querySelectorAll("[data-preset]").forEach(function(b) { b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); }); profilePreview(); } }
     else if (action === "account") renderAccountModal(account ? "account" : "login");
     else if (action === "close-account") closeAccountModal();
     else if (action === "account-logout") signOut();
@@ -805,17 +1127,17 @@
     else if (action === "clear-order") { session.order = []; draw(); }
     else if (action === "review-lesson") { stopLessonPlay(); session.stage = "learn"; session.lv = 0; session.seen = [0]; session.ls = 0; draw(); }
     else if (action === "lesson-prev") { stopLessonPlay(); if (session.ls > 0) session.ls -= 1; draw(); }
-    else if (action === "lesson-next") { stopLessonPlay(); var cl = CHAL_BY_ID[current]; if (cl && session.ls < LESSONS[cl.id].steps.length - 1) session.ls += 1; draw(); }
+    else if (action === "lesson-next") { stopLessonPlay(); var cl = lessonItem(current); if (cl && session.ls < LESSONS[cl.id].steps.length - 1) session.ls += 1; draw(); }
     else if (action === "lesson-play") {
-      var cp = CHAL_BY_ID[current];
+      var cp = lessonItem(current);
       if (lessonTimer) { stopLessonPlay(); draw(); }
       else if (cp) {
         var total = LESSONS[cp.id].steps.length; if (session.ls >= total - 1) session.ls = 0;
-        lessonTimer = setInterval(function() { if (session.ls >= total - 1) { stopLessonPlay(); draw(); return; } session.ls += 1; if (session.ls >= total - 1) stopLessonPlay(); draw(); }, 2200); draw();
+        lessonTimer = setInterval(function() { if (session.ls >= total - 1) { stopLessonPlay(); draw(); return; } session.ls += 1; if (session.ls >= total - 1) stopLessonPlay(); draw(); }, lessonInterval()); draw();
       }
     }
-    else if (action === "lesson-done") { if (CHAL_BY_ID[current]) completeLesson(CHAL_BY_ID[current], false); }
-    else if (action === "lesson-skip") { if (CHAL_BY_ID[current]) completeLesson(CHAL_BY_ID[current], true); }
+    else if (action === "lesson-done") { if (lessonItem(current)) completeLesson(lessonItem(current), false); }
+    else if (action === "lesson-skip") { if (lessonItem(current)) completeLesson(lessonItem(current), true); }
     else if (action === "run-tests") {
       var cc = CHAL_BY_ID[current], ed = root.querySelector(".sk-editor"), list = root.querySelector(".sk-tests");
       if (cc && ed && list) { session.code = ed.value; list.innerHTML = "<li>Running…</li>"; runTests(cc, ed.value).then(function(out) { list.innerHTML = testRows(cc, out); }); }
@@ -850,7 +1172,7 @@
   document.addEventListener("change", function(e) {
     if (e.target.id !== "profile-file" || !e.target.files || !e.target.files[0] || !profileDraft) return;
     var error = document.getElementById("profile-error");
-    shrinkPhoto(e.target.files[0]).then(function(url) { profileDraft.avatar = url; if (error) error.textContent = ""; profilePreview(); }).catch(function(problem) { if (error) error.textContent = problem.message; });
+    shrinkPhoto(e.target.files[0]).then(function(url) { profileDraft.avatar = url; if (error) error.textContent = ""; document.querySelectorAll("[data-preset]").forEach(function(b) { b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); }); profilePreview(); }).catch(function(problem) { if (error) error.textContent = problem.message; });
     e.target.value = "";
   });
   document.addEventListener("keydown", function(e) {
@@ -858,12 +1180,11 @@
     if (e.key === "Enter" && e.target.classList && e.target.classList.contains("sk-blank")) { var c = CHAL_BY_ID[current]; if (c && techReady(c)) techSubmit(c); }
   });
   document.addEventListener("submit", function(e) {
-    if (e.target.id === "account-form") { e.preventDefault(); submitAccount(e.target); }
+    if (e.target.id === "auth-form") { e.preventDefault(); submitAccount(e.target); }
     if (e.target.id === "profile-form") { e.preventDefault(); submitProfile(e.target); }
   });
-  if (AI) AI.attach({ root: root, state: function() { return state; }, view: function() { return view; }, esc: esc, say: say, save: save, beep: beep, go: go, redraw: draw, trackTabs: trackTabs, addXp: addXp });
-  draw();
+  applySettings(getSettings());
   syncThemeUi();
-  syncAccountUi();
   initAccount();
+  window.XPeditionGo = go;
 })(); 

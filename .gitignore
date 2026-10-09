@@ -5,6 +5,7 @@ skillquest/data/*.tmp
 # Secrets
 .env
 .env.*
+!.env.example
 
 # OS and tooling
 .DS_Store
