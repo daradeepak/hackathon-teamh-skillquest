@@ -16,7 +16,7 @@
   }); SCEN.forEach(function(x) { SCEN_BY_ID[x.id] = x; }); CHAL.forEach(function(x) { CHAL_BY_ID[x.id] = x; });
   var timer = null, session = fresh(), reelIndex = 0, reelRevealed = false, reelAnswer = null, reelFeedback = "";
   var REELS = D.reels, SIM_STEPS = D.story.scenes;
-  function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) }, binary: { done: !!(x && x.binary && x.binary.done) } }; }
+  function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) }, binary: { done: !!(x && x.binary && x.binary.done) }, reverse: { done: !!(x && x.reverse && x.reverse.done) } }; }
   var AVATAR_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
   function fresh() { return { choice: null, lines: [], order: [], pairs: {}, pending: null, fill: [], code: "", busy: false, stage: "play", lv: 0, seen: [0], ls: 0, result: null }; }
   function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
@@ -137,6 +137,7 @@
     stopLessonPlay(); closeAccountModal();
     if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (window.XPBinarySearch) window.XPBinarySearch.unmount();
+    if (window.XPReverseString) window.XPReverseString.unmount();
     document.body.classList.add("auth-locked");
     var shell = document.querySelector(".app-shell"), gate = document.getElementById("auth-root");
     if (shell) shell.hidden = true;
@@ -372,14 +373,16 @@
     else if (view === "dsa") { label.textContent = "Play Lab · DSA"; dsaPage(); }
     else if (view === "sort") { label.textContent = "Play Lab · DSA · Bubble Sort"; sortPage(); }
     else if (view === "search") { label.textContent = "Play Lab · DSA · Binary Search"; searchPage(); }
+    else if (view === "reverse") { label.textContent = "Play Lab · DSA · Reverse String"; reversePage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || TRAIL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search"].indexOf(view) >= 0)); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search", "reverse"].indexOf(view) >= 0)); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (view === "search") mountSearchLab(); else if (window.XPBinarySearch) window.XPBinarySearch.unmount();
+    if (view === "reverse") mountReverseLab(); else if (window.XPReverseString) window.XPReverseString.unmount();
     if (MINI_GAME_VIEWS.indexOf(view) < 0) { unmountMiniGames(); root.removeAttribute("data-mini"); }
     syncAccountUi(); syncDailyTaskbar();
   }
@@ -577,7 +580,8 @@
   }
   var ALGOS = [
     { view: "sort", icon: "🫧", title: "Bubble Sort", tag: "SORTING · O(n²)", desc: "Watch neighbours compare and swap while the real code lights up beside them.", done: function() { return state.sortLab.bubble.done; } },
-    { view: "search", icon: "🔎", title: "Binary Search", tag: "SEARCHING · O(log n)", desc: "Halve a sorted list again and again until the target is found, one step at a time.", done: function() { return state.sortLab.binary.done; } }
+    { view: "search", icon: "🔎", title: "Binary Search", tag: "SEARCHING · O(log n)", desc: "Halve a sorted list again and again until the target is found, one step at a time.", done: function() { return state.sortLab.binary.done; } },
+    { view: "reverse", icon: "🔁", title: "Reverse a String", tag: "TWO POINTERS · O(n)", desc: "Two pointers swap characters from both ends until they meet, with the code lit up beside them.", done: function() { return state.sortLab.reverse.done; } }
   ];
   function algosDone() { return ALGOS.filter(function(a) { return a.done(); }).length; }
   function animatedPage() {
@@ -602,6 +606,20 @@
     state.sortLab.binary.done = true; state.xp += 40; save();
     say("Binary Search complete! +40 XP");
     return { message: "🎉 " + (result.found ? "Found it" : "Ruled it out") + " in " + result.steps + " step" + (result.steps === 1 ? "" : "s") + ". +40 XP and the Search Savant badge!" };
+  }
+  function reversePage() {
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Reverse a String 🔁</h1><p>Type any text, then step forwards or backwards. Reach the end once to earn XP and the Pointer Pro badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="reverse-string-host"></div>';
+  }
+  function mountReverseLab() {
+    var host = document.getElementById("reverse-string-host");
+    if (!host || !window.XPReverseString) { if (host) host.textContent = "The visualizer could not load. Refresh the page to try again."; return; }
+    window.XPReverseString.mount(host, { alreadyDone: state.sortLab.reverse.done, onComplete: completeReverseString });
+  }
+  function completeReverseString(result) {
+    if (state.sortLab.reverse.done) return { message: "✓ Pointer Pro badge earned — replay any time for practice." };
+    state.sortLab.reverse.done = true; state.xp += 40; save();
+    say("Reverse a String complete! +40 XP");
+    return { message: "🎉 You reversed " + result.length + " character" + (result.length === 1 ? "" : "s") + " in " + result.steps + " steps. +40 XP and the Pointer Pro badge!" };
   }
   function sortPage() {
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Bubble Sort 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="bubble-sort-host"></div>';
@@ -663,7 +681,8 @@
       { icon: "📼", title: "Pocket Professor", desc: "Collect all " + REELS.length + " Knowledge Reels.", unlocked: state.reels.length >= REELS.length },
       { icon: "🎭", title: "Calm in the Chaos", desc: "Finish the workplace simulator.", unlocked: state.simulator.done },
       { icon: "🔎", title: "Search Savant", desc: "Finish a Binary Search lab.", unlocked: state.sortLab.binary.done },
-      { icon: "🫧", title: "Sort Sprinter", desc: "Watch the whole Bubble Sort lab.", unlocked: state.sortLab.bubble.done }
+      { icon: "🫧", title: "Sort Sprinter", desc: "Watch the whole Bubble Sort lab.", unlocked: state.sortLab.bubble.done },
+      { icon: "🔁", title: "Pointer Pro", desc: "Finish the Reverse a String lab.", unlocked: state.sortLab.reverse.done }
     ];
   }
   function achievementsPage() {
