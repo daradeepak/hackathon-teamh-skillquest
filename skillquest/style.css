@@ -809,3 +809,11 @@ body { background: radial-gradient(circle at 90% 3%, #eee8ff 0, transparent 25re
   .account-dialog { padding: 24px 19px; border-radius: 22px; }
   .account-dialog h2 { font-size: 23px; }
 }
+
+/* Phones: keep the daily bar to one compact row so content starts higher on the screen */
+@media (max-width: 620px) {
+  .daily-taskbar-chips { display: none; }
+  .daily-taskbar-inner { flex-wrap: nowrap; gap: 8px; padding: 8px 12px; }
+  .daily-taskbar-label { font-size: 10px; letter-spacing: .3px; }
+  .daily-taskbar-progress { order: 0; flex: 1 1 40px; min-width: 40px; max-width: none; }
+}
