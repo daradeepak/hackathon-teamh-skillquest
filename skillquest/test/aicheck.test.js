@@ -42,6 +42,13 @@ test("Merge Defender wave stars are validated", () => {
   assert.deepStrictEqual(p.aicheck.waves, { 1: 3, 2: 3 });
 });
 
+test("Bug Radar attempts are validated and capped", () => {
+  const many = Array.from({ length: 15 }, (_, i) => ({ at: i, c: 9, t: 999 }));
+  const p = sanitizeProgress({ aicheck: { radar: many.concat(["bad"]) } });
+  assert.strictEqual(p.aicheck.radar.length, 10);
+  assert.deepStrictEqual(p.aicheck.radar[0], { at: 0, c: 5, t: 200 });
+});
+
 test("completing every AI Code Check game fits under the XP cap", () => {
   const total = Object.values(games).reduce((sum, g) => sum + g.xp, 0);
   assert.ok(MAX_XP > total);
