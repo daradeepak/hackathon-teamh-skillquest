@@ -192,7 +192,61 @@ window.DEVQUEST_CONTENT = {
     { id: "js-predict-type", skill: "javascript", kind: "fill", title: "Predict and Type", xp: 40, emoji: "🔮",
       prompt: "Work out what this prints, then type it exactly (separate values with a space).",
       code: ["const nums = [1, 2, 3];", "const out = nums.map(n => n * 2);", "console.log(out.length, out[2]);"], ask: "It prints:", blanks: [["3 6"]],
-      explain: "map builds [2, 4, 6]. Its length is 3 and the item at index 2 is 6." }
+      explain: "map builds [2, 4, 6]. Its length is 3 and the item at index 2 is 6." },
+    { id: "html-landmarks", skill: "html", kind: "arrange", title: "Landmark order", xp: 45, emoji: "🧭",
+      prompt: "Tap the page landmarks in the order they usually appear from top to bottom.",
+      items: ["<footer>", "<header>", "<main>"], answer: [1, 2, 0],
+      explain: "Readers and assistive tech expect header first, then main content, then footer." },
+    { id: "html-input-types", skill: "html", kind: "match", title: "Input types", xp: 45, emoji: "⌨️",
+      prompt: "Match each input type to what it is best for.",
+      pairs: [["type=\"email\"", "Email addresses"], ["type=\"checkbox\"", "On/off choices"], ["type=\"number\"", "Numeric values"], ["type=\"search\"", "Search fields"]], rightOrder: [0, 1, 2, 3],
+      explain: "Picking the right type gives better keyboards on mobile and clearer validation." },
+    { id: "html-viewport-meta", skill: "html", kind: "fill", title: "Mobile viewport", xp: 45, emoji: "📱",
+      prompt: "Type the missing attribute name so the page scales correctly on phones.",
+      code: ["<meta name=\"viewport\" ___=\"width=device-width, initial-scale=1\">"], blanks: [["content"]],
+      explain: "The viewport meta tag tells mobile browsers to use the device width instead of pretending to be a desktop page." },
+    { id: "html-fake-control", skill: "html", kind: "tapLine", title: "Real controls only", xp: 45, emoji: "♿",
+      prompt: "Tap the line that is not a proper interactive control for keyboard and screen-reader users.",
+      code: ["<button type=\"submit\">Send</button>", "<div class=\"btn\" onclick=\"send()\">Send</div>", "<a href=\"/help\">Help</a>"], bad: [1],
+      explain: "A div with onclick is not focusable or announced as a button unless you rebuild what native elements give you for free." },
+    { id: "css-stack-column", skill: "css", kind: "live", title: "Stack the cards", xp: 50, emoji: "📱",
+      prompt: "Stack the two cards vertically with a 12px gap between them.",
+      html: "<div class=\"stack\"><div class=\"card\">A</div><div class=\"card\">B</div></div>",
+      base: ".stack { width: 100px; background: #f3f4f6; padding: 8px; } .card { height: 36px; background: #705ce8; color: #fff; display: grid; place-items: center; font: 700 14px sans-serif; border-radius: 8px; }",
+      starter: ".stack {\n  /* flex column + gap */\n}", check: "column-stack",
+      explain: "display: flex; flex-direction: column; gap: 12px; stacks children top to bottom with even spacing." },
+    { id: "css-hero-style", skill: "css", kind: "live", title: "Style the hero", xp: 50, emoji: "🅰️",
+      prompt: "Make the heading bold and coral (#f47b67).",
+      html: "<h1 class=\"hero\">Welcome to XPedition</h1>",
+      base: ".hero { font-size: 22px; margin: 0; font-weight: 400; color: #333; }",
+      starter: ".hero {\n  /* bold + coral */\n}", check: "bold-heading",
+      explain: "font-weight: 700 (or bold) and color: #f47b67 match the XPedition accent palette." },
+    { id: "css-display-match", skill: "css", kind: "match", title: "Display modes", xp: 45, emoji: "🧩",
+      prompt: "Match each display value to what it does in layout.",
+      pairs: [["display: flex", "One-dimensional row or column layout"], ["display: grid", "Two-dimensional rows and columns"], ["display: block", "Stack elements vertically"], ["display: inline", "Flow with text, no width break"]], rightOrder: [0, 1, 2, 3],
+      explain: "Flex handles one axis at a time; grid handles both; block and inline are the classic flow modes." },
+    { id: "css-units-fill", skill: "css", kind: "fill", title: "Relative units", xp: 45, emoji: "📐",
+      prompt: "Fill in the unit that sizes text relative to the root font size.",
+      code: [".title { font-size: 1.5___; }"], blanks: [["rem"]],
+      explain: "rem scales with the root element, so it stays consistent across the page unlike px alone." },
+    { id: "js-cap-values", skill: "javascript", kind: "run", title: "Cap the values", xp: 50, emoji: "📊",
+      prompt: "Implement capAt(nums, max) so every number above max becomes max.",
+      fn: "capAt", starter: "function capAt(nums, max) {\n  // your code here\n}",
+      tests: [{ args: [[1, 9, 3], 5], expected: [1, 5, 3] }, { args: [[10, 20], 15], expected: [10, 15] }, { args: [[], 5], expected: [] }],
+      explain: "map lets you transform each item: n > max ? max : n keeps the rest unchanged." },
+    { id: "js-count-truthy", skill: "javascript", kind: "run", title: "Count the active flags", xp: 50, emoji: "🚦",
+      prompt: "Write countActive(flags) to return how many values are truthy.",
+      fn: "countActive", starter: "function countActive(flags) {\n  // your code here\n}",
+      tests: [{ args: [[true, false, true]], expected: 2 }, { args: [[0, "", null]], expected: 0 }, { args: [[1, "yes", {}]], expected: 3 }],
+      explain: "filter(Boolean) removes falsy values; return the new array's length." },
+    { id: "js-spread-copy", skill: "javascript", kind: "fill", title: "Spread into a copy", xp: 45, emoji: "📋",
+      prompt: "Type the operator that copies all items from arr into a new array literal.",
+      code: ["const clone = [___arr];"], blanks: [["..."]],
+      explain: "...arr in an array literal spreads each element into the new array without mutating the original." },
+    { id: "js-destructure", skill: "javascript", kind: "arrange", title: "Destructuring order", xp: 45, emoji: "🎁",
+      prompt: "Tap the lines in the order you would write them to pull first and rest from an array.",
+      items: ["const [first, ...rest] = items;", "const items = [10, 20, 30];", "console.log(first, rest.length);"], answer: [1, 0, 2],
+      explain: "Create the array, destructure first and gather the rest with ...rest, then use the values." }
   ],
   /* Interactive lessons, keyed by the challenge they prepare you for.
      "compare" lessons let the learner switch between versions and see code + result; "steps" lessons walk through code one step at a time. */
@@ -301,6 +355,92 @@ window.DEVQUEST_CONTENT = {
         { focus: [1], state: [["n", "2"], ["out so far", "[2, 4]"]], say: "2 becomes 4." },
         { focus: [1], state: [["n", "3"], ["out so far", "[2, 4, 6]"]], say: "3 becomes 6. nums itself is unchanged." },
         { focus: [2], state: [["out.length", "3"], ["out[2]", "6"], ["prints", "3 6"]], say: "Positions start at 0, so out[2] is the third item: 6. console.log prints both values." }
-      ], key: "map returns a new array the same length as the original." }
+      ], key: "map returns a new array the same length as the original." },
+    "html-landmarks": { title: "Landmarks on a page", kind: "steps", intro: "Landmarks help everyone skim a long page.",
+      code: ["<header>Site chrome</header>", "<main>Primary content</main>", "<footer>Copyright</footer>"],
+      steps: [
+        { focus: [0], state: [["Role", "Banner / top"]], say: "<header> usually holds the logo and top navigation." },
+        { focus: [1], state: [["Role", "Main content"]], say: "<main> wraps the one thing this page is about." },
+        { focus: [2], state: [["Role", "Footer"]], say: "<footer> closes the page with links and legal text." }
+      ], key: "Typical top-to-bottom order: header, main, footer." },
+    "html-input-types": { title: "Input types", kind: "compare", intro: "The type attribute changes keyboard and validation behaviour.",
+      base: "input { padding: 6px; width: 200px; } label { display: block; font-weight: 600; margin-bottom: 4px; }",
+      html: "<label>Field</label><input>",
+      variants: [
+        { label: "email", code: "<input type=\"email\">", page: "<label>Email</label><input type=\"email\" placeholder=\"you@co.com\">", say: "Email keyboard", caption: "Mobile shows the @ key and can validate the shape of an address." },
+        { label: "number", code: "<input type=\"number\">", page: "<label>Qty</label><input type=\"number\" value=\"2\">", say: "Numeric steppers", caption: "Browsers may show stepper controls and reject non-numbers." },
+        { label: "checkbox", code: "<input type=\"checkbox\">", page: "<label><input type=\"checkbox\"> Remember me</label>", say: "Toggle", caption: "Checkboxes represent on/off choices, not typed text." }
+      ], key: "Match the input type to the kind of data you are collecting." },
+    "html-viewport-meta": { title: "Viewport on mobile", kind: "compare", intro: "Without viewport meta, phones shrink a desktop layout.",
+      base: "body { font-family: sans-serif; padding: 12px; } h1 { font-size: 20px; }",
+      html: "<h1>Hello</h1><p>Readable text?</p>",
+      variants: [
+        { label: "Missing", code: "<!-- no viewport meta -->", page: "<h1>Hello</h1><p>Tiny text on phones.</p>", say: "Zoomed out", caption: "The browser assumes a wide desktop width unless you say otherwise." },
+        { label: "With viewport", code: "<meta name=\"viewport\"\n      content=\"width=device-width,\n               initial-scale=1\">", page: "<h1>Hello</h1><p>Text matches the device width.</p>", say: "Device width", caption: "content=\"width=device-width\" makes CSS pixels match the phone screen." }
+      ], key: "Always include a viewport meta tag for responsive pages." },
+    "html-fake-control": { title: "Buttons vs divs", kind: "compare", intro: "Native controls work with keyboard and assistive tech out of the box.",
+      base: ".btn { padding: 8px 12px; background: #705ce8; color: #fff; border-radius: 8px; display: inline-block; cursor: pointer; } button { padding: 8px 12px; background: #705ce8; color: #fff; border: 0; border-radius: 8px; }",
+      html: "<button>Send</button>",
+      variants: [
+        { label: "<button>", code: "<button type=\"submit\">Send</button>", page: "<button>Send</button>", say: "“Send, button.”", caption: "Focusable with Tab, activatable with Enter/Space, announced as a button." },
+        { label: "<div onclick>", code: "<div class=\"btn\" onclick=\"send()\">Send</div>", page: "<div class=\"btn\">Send</div>", say: "“Send.” (not a button)", caption: "Looks similar but is not in the tab order unless you add tabindex and keyboard handlers." }
+      ], key: "Use <button> for actions unless you have a strong reason not to." },
+    "css-stack-column": { title: "Flex column stack", kind: "compare", intro: "Flex direction changes which way children flow.",
+      base: ".stack { width: 100px; background: #f3f4f6; padding: 8px; } .card { height: 36px; background: #705ce8; color: #fff; display: grid; place-items: center; font: 700 14px sans-serif; border-radius: 8px; }",
+      html: "<div class=\"stack\"><div class=\"card\">A</div><div class=\"card\">B</div></div>",
+      variants: [
+        { label: "Row (default)", code: ".stack {\n  display: flex;\n}", css: ".stack { display: flex; }", caption: "Children sit side by side." },
+        { label: "Column + gap", code: ".stack {\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n}", css: ".stack { display: flex; flex-direction: column; gap: 12px; }", caption: "column stacks top to bottom; gap adds space between." }
+      ], key: "flex-direction: column stacks; gap spaces items without margin hacks." },
+    "css-hero-style": { title: "Typography accents", kind: "compare", intro: "Weight and color draw attention to headings.",
+      base: ".hero { font-size: 22px; margin: 0; }",
+      html: "<h1 class=\"hero\">Welcome</h1>",
+      variants: [
+        { label: "Normal", code: ".hero {\n  font-weight: 400;\n  color: #333;\n}", css: "", caption: "Default body-like weight." },
+        { label: "Bold coral", code: ".hero {\n  font-weight: 700;\n  color: #f47b67;\n}", css: ".hero { font-weight: 700; color: #f47b67; }", caption: "Bold weight plus the XPedition coral accent." }
+      ], key: "font-weight and color are the fastest way to style a hero line." },
+    "css-display-match": { title: "Display modes", kind: "steps", intro: "display changes how an element participates in layout.",
+      code: [".row { display: flex; }", ".grid { display: grid; }", ".box { display: block; }", "span { display: inline; }"],
+      steps: [
+        { focus: [0], state: [["Axis", "One at a time"]], say: "Flex lays children out along a row or column." },
+        { focus: [1], state: [["Axis", "Rows and columns"]], say: "Grid controls both dimensions together." },
+        { focus: [2], state: [["Flow", "New line"]], say: "Block elements start on a new line and stretch wide." },
+        { focus: [3], state: [["Flow", "With text"]], say: "Inline elements sit in the text line without breaking it." }
+      ], key: "Pick flex, grid, block, or inline based on the layout job." },
+    "css-units-fill": { title: "rem vs px", kind: "compare", intro: "Relative units scale with user settings.",
+      base: "html { font-size: 16px; } .title { margin: 0; }",
+      html: "<p class=\"title\">Hello</p>",
+      variants: [
+        { label: "px", code: ".title { font-size: 24px; }", css: ".title { font-size: 24px; }", caption: "Fixed pixels ignore root font-size changes." },
+        { label: "rem", code: ".title { font-size: 1.5rem; }", css: ".title { font-size: 1.5rem; }", caption: "1.5rem equals 1.5 × the root font size (24px when root is 16px)." }
+      ], key: "rem ties sizing to the root element so type scales consistently." },
+    "js-cap-values": { title: "map with a cap", kind: "steps", intro: "Transform each number without a manual loop if you prefer map.",
+      code: ["function capAt(nums, max) {", "  return nums.map(n => n > max ? max : n);", "}", "capAt([1, 9, 3], 5);"],
+      steps: [
+        { focus: [0], state: [["Input", "[1, 9, 3]"], ["max", "5"]], say: "We need a new array with nothing above 5." },
+        { focus: [1], state: [["n = 9", "becomes 5"]], say: "For each n, compare to max and keep the smaller effective value." },
+        { focus: [3], state: [["Result", "[1, 5, 3]"]], say: "9 becomes 5; the others stay the same." }
+      ], key: "map returns a new array; use a ternary inside to clamp values." },
+    "js-count-truthy": { title: "Truthy counts", kind: "steps", intro: "filter builds a subset; length counts it.",
+      code: ["function countActive(flags) {", "  return flags.filter(Boolean).length;", "}", "countActive([true, false, true]);"],
+      steps: [
+        { focus: [3], state: [["Input", "[true, false, true]"]], say: "We only want to count the active flags." },
+        { focus: [1], state: [["Keeps", "true values"]], say: "Boolean removes false, 0, \"\", null, and undefined." },
+        { focus: [3], state: [["Answer", "2"]], say: "Two values remain, so the count is 2." }
+      ], key: "filter(Boolean) then .length is a compact active-count pattern." },
+    "js-spread-copy": { title: "Spread syntax", kind: "steps", intro: "Spread copies elements into a new array literal.",
+      code: ["const arr = [1, 2, 3];", "const clone = [...arr];", "clone.push(4);"],
+      steps: [
+        { focus: [0], state: [["arr", "[1, 2, 3]"]], say: "Start with an array we do not want to mutate." },
+        { focus: [1], state: [["clone", "[1, 2, 3]"]], say: "...arr expands each item into the new array." },
+        { focus: [2], state: [["arr", "unchanged"]], say: "Pushing to clone does not mutate arr." }
+      ], key: "[...arr] is a shallow copy of the array." },
+    "js-destructure": { title: "Array destructuring", kind: "steps", intro: "Pull the head and tail from an array in one line.",
+      code: ["const items = [10, 20, 30];", "const [first, ...rest] = items;", "console.log(first, rest);"],
+      steps: [
+        { focus: [0], state: [["items", "[10, 20, 30]"]], say: "Start with an array of values." },
+        { focus: [1], state: [["first", "10"], ["rest", "[20, 30]"]], say: "first takes index 0; ...rest gathers the remaining items." },
+        { focus: [2], state: [["prints", "10 [20,30]"]], say: "rest is still an array containing the tail." }
+      ], key: "Order matters: define the array, destructure, then use the values." }
   }
 };

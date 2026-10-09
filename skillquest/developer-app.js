@@ -31,7 +31,8 @@
   function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
   function blankProgress(name) {
     return { name: name || "Learner", avatar: "", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, lessons: {}, daily: { date: dayKey(), actions: [], claimed: false },
-      reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 } };
+      reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 },
+      minigames: { matchBest: 0, truthBest: 0, bracketBest: 0, memoryBestEasy: 0, memoryBestMedium: 0, memoryBestHard: 0, gitlineBest: 0, kebabBest: 0, statusBest: 0, xpBanked: 0 } };
   }
   /* Accepts saved progress from this or an older version and keeps only values that are still valid. */
   function normalize(p, name) {
@@ -46,8 +47,10 @@
       var v = Number(p.tech[id]); if (CHAL_BY_ID[id] && isFinite(v) && v > 0) tech[id] = Math.min(100, Math.round(v));
     });
     if (p.lessons && typeof p.lessons === "object") Object.keys(p.lessons).forEach(function(id) { if (LESSONS[id] && p.lessons[id]) learned[id] = true; });
+    var mg = p.minigames && typeof p.minigames === "object" ? p.minigames : {};
     return Object.assign(base, { lessons: learned, avatar: AVATAR_RE.test(p.avatar) ? p.avatar : "", tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
-      reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}) });
+      reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}),
+      minigames: { matchBest: Math.max(0, Math.floor(Number(mg.matchBest)) || 0), truthBest: Math.max(0, Math.floor(Number(mg.truthBest)) || 0), bracketBest: Math.max(0, Math.floor(Number(mg.bracketBest)) || 0), memoryBestEasy: Math.max(0, Math.floor(Number(mg.memoryBestEasy)) || 0), memoryBestMedium: Math.max(0, Math.floor(Number(mg.memoryBestMedium)) || 0), memoryBestHard: Math.max(0, Math.floor(Number(mg.memoryBestHard)) || 0, Math.floor(Number(mg.memoryBest)) || 0), gitlineBest: Math.max(0, Math.floor(Number(mg.gitlineBest)) || 0), kebabBest: Math.max(0, Math.floor(Number(mg.kebabBest)) || 0), statusBest: Math.max(0, Math.floor(Number(mg.statusBest)) || 0), xpBanked: Math.max(0, Math.floor(Number(mg.xpBanked)) || 0) } });
   }
   function seed() { return blankProgress("Learner"); }
   var state = seed();
@@ -136,7 +139,7 @@
     var shell = document.querySelector(".app-shell"), gate = document.getElementById("auth-root");
     if (shell) shell.hidden = false;
     if (gate) { gate.hidden = true; gate.innerHTML = ""; }
-    syncAccountUi(); draw();
+    syncAccountUi(); syncDailyTaskbar(); draw();
     var main = document.getElementById("app-main"); if (main) main.focus({ preventScroll: true });
   }
   function renderAuth(mode, notice) {
@@ -149,9 +152,9 @@
     if (!gate) return;
     gate.hidden = false;
     var signup = mode === "signup";
-    gate.innerHTML = '<main class="auth" aria-labelledby="auth-title"><section class="auth-hero"><div class="auth-brand"><span class="brand-mark xp-logo auth-logo" aria-hidden="true"><span class="xp-logo-text">XP</span><span class="xp-logo-plus">+</span></span><span class="auth-wordmark">xpedition<span class="brand-dot">.</span></span></div>' +
-      '<h2 class="auth-tagline">Level up the skills that matter at work, one short challenge at a time.</h2><ul class="auth-points"><li><span>💬</span><div><strong>Soft-skill scenarios</strong><small>Real workplace moments with no wrong answers.</small></div></li><li><span>💻</span><div><strong>HTML, CSS and JavaScript</strong><small>See the concept, then prove it in a hands-on challenge.</small></div></li><li><span>🏆</span><div><strong>XP, levels and a leaderboard</strong><small>Watch every skill grow as you play.</small></div></li></ul><div class="auth-mascot" aria-hidden="true">🦊<span>Ready for an expedition?</span></div></section>' +
-      '<section class="auth-card"><button type="button" class="theme-toggle auth-theme" data-action="theme" aria-label="Switch theme">' + (currentTheme() === "dark" ? "☀️" : "🌙") + '</button><span class="account-kicker">' + (signup ? "NEW EXPLORER" : "PLAYER LOGIN") + '</span><h1 id="auth-title">' + (signup ? "Start your expedition" : "Welcome back, explorer!") + '</h1><p class="auth-intro">' + (signup ? "Create your player card to save your XP and skills." : "Sign in to pick up right where you left off.") + '</p>' +
+    gate.innerHTML = '<main class="auth" aria-labelledby="auth-title"><section class="auth-hero"><div class="auth-brand"><span class="brand-mark xp-logo auth-logo" aria-hidden="true"><span class="xp-logo-text">XP</span><span class="xp-logo-plus">+</span></span><span class="auth-wordmark">XPedition<span class="brand-dot">.</span></span></div>' +
+      '<h2 class="auth-tagline">Level up the skills that matter at work, one short challenge at a time.</h2><ul class="auth-points"><li><span>💬</span><div><strong>Soft-skill scenarios</strong><small>Real workplace moments with no wrong answers.</small></div></li><li><span>💻</span><div><strong>HTML, CSS and JavaScript</strong><small>See the concept, then prove it in a hands-on challenge.</small></div></li><li><span>🏆</span><div><strong>XP, levels and a leaderboard</strong><small>Watch every skill grow as you play.</small></div></li></ul><div class="auth-mascot" aria-hidden="true">🦊<span>Ready for XPedition?</span></div></section>' +
+      '<section class="auth-card"><button type="button" class="theme-toggle auth-theme" data-action="theme" aria-label="Switch theme">' + (currentTheme() === "dark" ? "☀️" : "🌙") + '</button><span class="account-kicker">' + (signup ? "NEW EXPLORER" : "PLAYER LOGIN") + '</span><h1 id="auth-title">' + (signup ? "Start your XPedition" : "Welcome back, explorer!") + '</h1><p class="auth-intro">' + (signup ? "Create your player card to save your XP and skills." : "Sign in to pick up right where you left off.") + '</p>' +
       (notice ? '<p class="auth-notice" role="status">' + esc(notice) + '</p>' : "") +
       '<div class="account-tabs" role="tablist"><button type="button" role="tab" aria-selected="' + !signup + '" data-account-mode="login" class="' + (!signup ? "active" : "") + '">Sign in</button><button type="button" role="tab" aria-selected="' + signup + '" data-account-mode="signup" class="' + (signup ? "active" : "") + '">Create account</button></div>' +
       '<form id="auth-form" data-mode="' + (signup ? "signup" : "login") + '" novalidate>' + (signup ? '<label class="account-field">Your name<input name="name" type="text" minlength="2" maxlength="40" autocomplete="name" required placeholder="e.g. Sam Rivera"></label>' : "") +
@@ -335,14 +338,44 @@
     if (TRAIL_BY_ID[id]) { curSkill = "javascript"; session.stage = "learn"; }
     draw(); window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  var LAB_VIEWS = ["lab", "daily", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
-  function go(where) { stopLessonPlay(); if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home"; view = where; current = null; hint = false; if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; } draw(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  var LAB_VIEWS = ["lab", "reels", "sim", "badges"], LAB_ENABLED = false; /* Play Lab is hidden for now; flip to true (and restore the sidebar button in index.html and the home banner) to bring it back */
+  function unmountMiniGames() { if (window.XPMiniGames) window.XPMiniGames.stop(); }
+  var MINI_GAME_VIEWS = ["minigame-truth", "minigame-memory", "minigame-gitline", "minigame-kebab"];
+  var MINI_BEST_KEY = { truth: "truthBest", gitline: "gitlineBest", kebab: "kebabBest" };
+  function memoryBestKey(diff) {
+    return diff === "easy" ? "memoryBestEasy" : (diff === "hard" ? "memoryBestHard" : "memoryBestMedium");
+  }
+  function ensureMiniGames() { if (!state.minigames) state.minigames = { matchBest: 0, truthBest: 0, bracketBest: 0, memoryBestEasy: 0, memoryBestMedium: 0, memoryBestHard: 0, gitlineBest: 0, kebabBest: 0, statusBest: 0, xpBanked: 0 }; }
+  function awardMiniGameXp(amount, message) {
+    var n = Math.max(0, Math.min(500, Math.floor(Number(amount)) || 0));
+    if (!n) return;
+    state.xp += n;
+    ensureMiniGames();
+    state.minigames.xpBanked = (state.minigames.xpBanked || 0) + n;
+    save();
+    syncAccountUi();
+    if (message) say(message);
+  }
+  function go(where) {
+    stopLessonPlay();
+    if (!LAB_ENABLED && has(LAB_VIEWS, where)) where = "home";
+    if (MINI_GAME_VIEWS.indexOf(view) >= 0) { unmountMiniGames(); root.removeAttribute("data-mini"); }
+    view = where; current = null; hint = false;
+    if (where === "reels") { reelRevealed = false; reelAnswer = null; reelFeedback = ""; }
+    draw(); window.scrollTo({ top: 0, behavior: "smooth" });
+  }
   function draw() {
-    if (view === "home") { label.textContent = "Home"; home(); if (LAB_ENABLED) root.insertAdjacentHTML("afterbegin", dailyBanner()); }
+    if (view === "home") { label.textContent = "Home"; home(); }
     else if (view === "map") { label.textContent = "Game Map"; track === "tech" ? techMap() : map(); }
     else if (view === "techskill") { label.textContent = "Game Map · " + SKILL_BY_ID[curSkill].name; techSkillPage(); }
     else if (view === "leaderboard") { label.textContent = "Leaderboard"; leaderboardPage(); }
+    else if (view === "achievements") { label.textContent = "Achievements"; achievementsPage(); }
     else if (view === "stats") { label.textContent = "Progress"; stats(); }
+    else if (view === "minigames") { label.textContent = "Mini games"; miniGamesPage(); }
+    else if (view === "minigame-truth") { label.textContent = "Mini games · Truth Rush"; miniTruthPage(); }
+    else if (view === "minigame-memory") { label.textContent = "Mini games · Status Pair Hunt"; miniMemoryPage(); }
+    else if (view === "minigame-gitline") { label.textContent = "Mini games · Git Line-up"; miniGitLinePage(); }
+    else if (view === "minigame-kebab") { label.textContent = "Mini games · Kebab Kanon"; miniKebabPage(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
     else if (view === "anim") { label.textContent = "Play Lab"; animatedPage(); }
     else if (view === "dsa") { label.textContent = "Play Lab · DSA"; dsaPage(); }
@@ -353,10 +386,11 @@
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || TRAIL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search"].indexOf(view) >= 0)); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search"].indexOf(view) >= 0)); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (view === "search") mountSearchLab(); else if (window.XPBinarySearch) window.XPBinarySearch.unmount();
-    syncAccountUi();
+    if (MINI_GAME_VIEWS.indexOf(view) < 0) { unmountMiniGames(); root.removeAttribute("data-mini"); }
+    syncAccountUi(); syncDailyTaskbar();
   }
   function skillRow(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT);
@@ -372,32 +406,128 @@
   function trackTabs(active) {
     return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button></div>';
   }
+  var SOFT_CARD_ACCENTS = {
+    leadership: "sk-tech-card--leadership", communication: "sk-tech-card--communication", "problem-solving": "sk-tech-card--problem",
+    collaboration: "sk-tech-card--collaboration", "time-management": "sk-tech-card--time", "decision-making": "sk-tech-card--decision"
+  };
   function skillCard(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT), list = SCEN.filter(function(x) { return x.skill === k.id; }), done = list.filter(function(x) { return played(x.id); }).length;
-    return '<button type="button" class="sk-card" data-skill="' + k.id + '"><span class="sk-card-top"><span class="sk-icon">' + skillIcon(k.id) + '</span><span class="sk-level">LEVEL ' + info.n + '</span></span><strong>' + esc(k.name) + '</strong><span class="sk-desc">' + esc(k.desc) + '</span>' +
-      '<span class="sk-card-foot"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></span><span class="sk-bar"><i style="width:' + info.pct + '%"></i></span><span class="sk-played">' + done + ' of ' + list.length + ' scenarios played</span></button>';
+    var accent = SOFT_CARD_ACCENTS[k.id] || "sk-tech-card--leadership";
+    return '<button type="button" class="sk-tech-card ' + accent + '" data-skill="' + k.id + '"><span class="sk-tech-card-shine" aria-hidden="true"></span>' +
+      '<span class="sk-tech-card-top"><span class="sk-tech-icon">' + skillIcon(k.id) + '</span><span class="sk-tech-level">Level ' + info.n + '</span></span>' +
+      '<strong class="sk-tech-title">' + esc(k.name) + '</strong><span class="sk-tech-desc">' + esc(k.desc) + '</span>' +
+      '<span class="sk-tech-tags"><span class="sk-tech-tag">Scenarios ×' + list.length + '</span><span class="sk-tech-tag">No wrong answers</span></span>' +
+      '<div class="sk-tech-progress"><div class="sk-tech-progress-row"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : info.next + " XP to next level") + '</span></div>' +
+      '<span class="sk-bar sk-tech-bar"><i style="width:' + info.pct + '%"></i></span></div>' +
+      '<span class="sk-tech-foot">' + done + " / " + list.length + ' scenarios played</span><span class="sk-tech-cta">Pick scenario →</span></button>';
   }
-  function capabilityPage(tab, description, cards, cta, note) {
-    var pl = playerLevel();
-    return '<div class="sk"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Game Map</h1><p>' + description + '</p></div>' + trackTabs(tab) + '</section>' +
-      '<section class="sk-player"><div class="sk-player-level"><span class="sk-eyebrow">PLAYER LEVEL</span><strong>' + pl.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>Level ' + pl.n + ' — ' + esc(pl.name) + '</h2><span>' + state.xp + (pl.next === null ? " XP" : " / " + pl.next + " XP") + '</span></div>' +
+  var TECH_KIND_LABELS = { tapLine: "Tap the bug", arrange: "Ordering", match: "Matching", fill: "Fill-in", live: "Live CSS", run: "Code runner" };
+  function capabilityPage(tab, description, cards, cta, note, gridClass) {
+    var pl = playerLevel(), grid = gridClass || "sk-tech-grid", wrap = " sk-tech-map";
+    return '<div class="sk' + wrap + '"><section class="sk-head"><div><span class="sk-eyebrow">CAPABILITY MAP</span><h1>Game Map</h1><p>' + description + '</p></div>' + trackTabs(tab) + '</section>' +
+      '<section class="sk-player sk-player-tech"><div class="sk-player-level"><span class="sk-eyebrow">PLAYER LEVEL</span><strong>' + pl.n + '</strong></div><div class="sk-player-body"><div class="sk-player-row"><h2>Level ' + pl.n + ' — ' + esc(pl.name) + '</h2><span>' + state.xp + (pl.next === null ? " XP" : " / " + pl.next + " XP") + '</span></div>' +
       '<div class="sk-bar" role="progressbar" aria-label="Progress to the next player level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pl.pct + '"><i style="width:' + pl.pct + '%"></i></div><p>' + esc(pl.blurb) + '</p></div></section>' +
-      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">INDIVIDUAL PROGRESSION</span><h2>' + (tab === "tech" ? "Technical Skill Levels" : "Skill Levels") + '</h2></div><button class="primary-button" data-action="' + cta[0] + '">' + cta[1] + '</button></div><div class="sk-grid">' + cards + '</div><p class="sk-note">' + note + '</p></section></div>';
+      '<section><div class="sk-sec-head"><div><span class="sk-eyebrow">INDIVIDUAL PROGRESSION</span><h2>' + (tab === "tech" ? "Technical Skill Levels" : "Skill Levels") + '</h2></div><button class="primary-button" data-action="' + cta[0] + '">' + cta[1] + '</button></div><div class="' + grid + '">' + cards + '</div><p class="sk-note">' + note + '</p></section></div>';
   }
   function map() {
     var done = SCEN.filter(function(x) { return played(x.id); }).length;
     root.innerHTML = capabilityPage("core", "Your professional skills grow independently as you complete relevant scenarios.", SKILLS.map(skillCard).join(""), ["continue", "Play next scenario →"],
-      'Pick a skill to practise it. There are no right or wrong answers: each choice builds the skills it shows. ' + done + ' of ' + SCEN.length + ' scenarios played.');
+      'Pick a skill to practise it. There are no right or wrong answers: each choice builds the skills it shows. ' + done + ' of ' + SCEN.length + ' scenarios played.', "sk-tech-grid sk-soft-grid");
   }
   function techCard(k) {
     var xp = state.skills[k.id], info = levelInfo(xp, SKILL_AT), list = CHAL.filter(function(x) { return x.skill === k.id; }), done = list.filter(function(x) { return techDone(x.id); }).length;
-    return '<button type="button" class="sk-card" data-tech="' + k.id + '"><span class="sk-card-top"><span class="sk-icon">' + skillIcon(k.id) + '</span><span class="sk-level">LEVEL ' + info.n + '</span></span><strong>' + esc(k.name) + '</strong><span class="sk-desc">' + esc(k.desc) + '</span>' +
-      '<span class="sk-card-foot"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : "Next: " + info.next + " XP") + '</span></span><span class="sk-bar"><i style="width:' + info.pct + '%"></i></span><span class="sk-played">' + done + ' of ' + list.length + ' challenges cleared</span></button>';
+    var kinds = {}, tags = [];
+    list.forEach(function(c) { kinds[c.kind] = (kinds[c.kind] || 0) + 1; });
+    Object.keys(kinds).forEach(function(kind) { tags.push('<span class="sk-tech-tag">' + esc(TECH_KIND_LABELS[kind] || kind) + " ×" + kinds[kind] + "</span>"); });
+    var accent = k.id === "html" ? "sk-tech-card--html" : (k.id === "css" ? "sk-tech-card--css" : "sk-tech-card--js");
+    return '<button type="button" class="sk-tech-card ' + accent + '" data-tech="' + k.id + '"><span class="sk-tech-card-shine" aria-hidden="true"></span>' +
+      '<span class="sk-tech-card-top"><span class="sk-tech-icon">' + skillIcon(k.id) + '</span><span class="sk-tech-level">Level ' + info.n + '</span></span>' +
+      '<strong class="sk-tech-title">' + esc(k.name) + '</strong><span class="sk-tech-desc">' + esc(k.desc) + '</span>' +
+      '<span class="sk-tech-tags">' + tags.join("") + '</span>' +
+      '<div class="sk-tech-progress"><div class="sk-tech-progress-row"><span>' + xp + ' XP</span><span>' + (info.next === null ? "Max level" : info.next + " XP to next level") + '</span></div>' +
+      '<span class="sk-bar sk-tech-bar"><i style="width:' + info.pct + '%"></i></span></div>' +
+      '<span class="sk-tech-foot">' + done + " / " + list.length + ' challenges cleared</span><span class="sk-tech-cta">Open path →</span></button>';
   }
   function techMap() {
     var done = CHAL.filter(function(x) { return techDone(x.id); }).length;
     root.innerHTML = capabilityPage("tech", "Sharpen your front-end skills with quick, game-style challenges.", TECH.map(techCard).join(""), ["continue-tech", "Play next challenge →"],
-      'Pick a skill to start a challenge. Score 60% or more to clear it, and improve your best score to earn the rest of its XP. ' + done + ' of ' + CHAL.length + ' challenges cleared.');
+      'Pick a skill to start a challenge. Score 60% or more to clear it, and improve your best score to earn the rest of its XP. ' + done + ' of ' + CHAL.length + ' challenges cleared.', "sk-tech-grid");
+  }
+  function miniGamesPage() {
+    ensureMiniGames();
+    var mg = state.minigames;
+    root.removeAttribute("data-mini");
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ARCADE</span><h1>Mini games 🕹️</h1><p>Short skill drills disguised as arcade breaks. Score, streak, and bank XP — no lecture walls.</p></div></section>' +
+      '<div class="mg-hub-grid">' +
+      '<button type="button" class="mg-card mg-card--truth" data-nav="minigame-truth"><span class="mg-card-shine"></span><span class="mg-card-icon">⚡</span><span class="mg-card-tag">QUIZ RUSH</span><strong>Truth Rush</strong><small>True or false on a timer. Streak for bonus points — read fast, decide faster.</small><span class="mg-card-go">Best score: ' + (mg.truthBest || 0) + ' · Play →</span></button>' +
+      '<button type="button" class="mg-card mg-card--memory" data-nav="minigame-memory"><span class="mg-card-shine"></span><span class="mg-card-icon">🌐</span><span class="mg-card-tag">MEMORY</span><strong>Status Pair Hunt</strong><small>Match HTTP codes to their meanings — easy, medium, or hard grid.</small><span class="mg-card-go">Best hard: ' + (mg.memoryBestHard || 0) + ' · Play →</span></button>' +
+      '<button type="button" class="mg-card mg-card--gitline" data-nav="minigame-gitline"><span class="mg-card-shine"></span><span class="mg-card-icon">🚂</span><span class="mg-card-tag">PUZZLE</span><strong>Git Line-up</strong><small>Order Git, HTML, and CSS steps — swap lines, then Ship it.</small><span class="mg-card-go">Best score: ' + (mg.gitlineBest || 0) + ' · Play →</span></button>' +
+      '<button type="button" class="mg-card mg-card--kebab" data-nav="minigame-kebab"><span class="mg-card-shine"></span><span class="mg-card-icon">🎯</span><span class="mg-card-tag">NAMING</span><strong>Kebab Kanon</strong><small>Context says CSS, JS, JSON, or Git — pick the spelling that actually belongs there.</small><span class="mg-card-go">Best score: ' + (mg.kebabBest || 0) + ' · Play →</span></button>' +
+      '</div><section class="lab-footer-tip"><span>🎮</span><p><b>Original XPedition arcade.</b> Built for quick reps, not copy-paste classics.</p></section>';
+  }
+  function miniGameCallbacks(kind) {
+    ensureMiniGames();
+    var paid = false;
+    return {
+      best: state.minigames[MINI_BEST_KEY[kind] || "truthBest"] || 0,
+      onBest: function(score) {
+        var k = MINI_BEST_KEY[kind] || "truthBest";
+        state.minigames[k] = Math.max(state.minigames[k] || 0, score);
+        save();
+      },
+      onEnd: function(result) {
+        if (paid || !result || !result.xp) return;
+        paid = true;
+        awardMiniGameXp(result.xp, "Nice run! +" + result.xp + " XP from mini games.");
+      }
+    };
+  }
+  function miniTruthPage() {
+    if (root.dataset.mini === "truth" && root.querySelector("#mg-truth-q")) return;
+    root.dataset.mini = "truth";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) window.XPMiniGames.mountTruth(host, miniGameCallbacks("truth"));
+    else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
+  }
+  function miniMemoryPage() {
+    if (root.dataset.mini === "memory" && (root.querySelector("#mg-memory-grid") || root.querySelector("#mg-memory-picker"))) return;
+    root.dataset.mini = "memory";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) {
+      var paid = false;
+      window.XPMiniGames.mountMemory(host, {
+        getBest: function(diff) { ensureMiniGames(); return state.minigames[memoryBestKey(diff)] || 0; },
+        onBest: function(diff, score) {
+          ensureMiniGames();
+          var k = memoryBestKey(diff);
+          state.minigames[k] = Math.max(state.minigames[k] || 0, score);
+          save();
+        },
+        onEnd: function(result) {
+          if (paid || !result || !result.xp) return;
+          paid = true;
+          awardMiniGameXp(result.xp, "Nice run! +" + result.xp + " XP from mini games.");
+        }
+      });
+    } else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
+  }
+  function miniGitLinePage() {
+    if (root.dataset.mini === "gitline" && root.querySelector("#mg-gitline-list")) return;
+    root.dataset.mini = "gitline";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) window.XPMiniGames.mountGitLine(host, miniGameCallbacks("gitline"));
+    else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
+  }
+  function miniKebabPage() {
+    if (root.dataset.mini === "kebab" && root.querySelector("#mg-kebab-choices")) return;
+    root.dataset.mini = "kebab";
+    root.innerHTML = '<div id="mg-host" class="mg"></div>';
+    var host = document.getElementById("mg-host");
+    if (host && window.XPMiniGames) window.XPMiniGames.mountKebab(host, miniGameCallbacks("kebab"));
+    else if (host) host.innerHTML = "<p>Mini games failed to load. Refresh the page.</p>";
   }
   function stats() {
     var pl = playerLevel(), list = SCEN.filter(function(x) { return played(x.id); }), top = SKILLS.slice().sort(function(a, b) { return state.skills[b.id] - state.skills[a.id]; })[0];
@@ -406,16 +536,39 @@
       '<div class="dev-stats-grid"><section class="dev-panel"><div class="dev-panel-head"><h3>🧠 Skill levels</h3><span>XP by skill</span></div>' + SKILLS.map(skillRow).join("") + '<div class="dev-panel-head sk-subhead"><h3>💻 Technical skills</h3></div>' + TECH.map(skillRow).join("") + '</section>' +
       '<section class="dev-panel"><div class="dev-panel-head"><h3>🗒️ Recent scenarios</h3><span>Your approach</span></div>' + (list.length ? list.slice(-6).reverse().map(function(x) { return '<div class="score-row"><span>' + esc(x.title) + '</span><b>' + String.fromCharCode(65 + state.scenarios[x.id]) + '</b></div>'; }).join("") : '<p class="dev-muted">Play a scenario and your choices show up here.</p>') + '</section></div><p class="dev-fineprint">All progress stays in this browser unless you sign in to a local account.</p>';
   }
-  var DAILY_TASKS = [
+  var DAILY_LAB_TASKS = [
     ["mission", "🎮", "Play a skill mission", "Any code challenge counts."],
     ["reel", "📼", "Watch a knowledge reel", "Flip a card and get its quick check right."],
     ["sim", "🎭", "Finish the workplace story", "Make three calls in the live scenario."]
   ];
-  function dailyCount() { ensureDaily(); return DAILY_TASKS.filter(function(t) { return has(state.daily.actions, t[0]); }).length; }
+  var DAILY_MAIN_TASKS = [
+    ["mission", "🎮", "Complete a task", "Play a soft-skill scenario or technical challenge."],
+    ["learn", "📖", "Finish a lesson", "Complete an interactive concept lesson (+10 XP)."],
+    ["clear", "⭐", "Clear a challenge", "Score 60% or higher on a technical challenge."]
+  ];
+  function dailyTaskDefs() { return LAB_ENABLED ? DAILY_LAB_TASKS : DAILY_MAIN_TASKS; }
+  function dailyCount() { ensureDaily(); return dailyTaskDefs().filter(function(t) { return has(state.daily.actions, t[0]); }).length; }
   function trackDaily(id) { ensureDaily(); if (!has(state.daily.actions, id)) state.daily.actions.push(id); }
+  function dailyTaskDest(id) {
+    if (LAB_ENABLED) return id === "mission" ? "map" : (id === "reel" ? "reels" : "sim");
+    track = id === "mission" ? track : "tech";
+    return "map";
+  }
+  function syncDailyTaskbar() {
+    var bar = document.getElementById("daily-taskbar"), shell = document.querySelector(".app-shell");
+    if (!bar) return;
+    if (!shell || shell.hidden || document.body.classList.contains("auth-locked")) { bar.hidden = true; bar.innerHTML = ""; return; }
+    ensureDaily();
+    var tasks = dailyTaskDefs(), total = tasks.length, n = dailyCount(), done = n === total;
+    bar.hidden = false;
+    bar.innerHTML = '<div class="daily-taskbar-inner"><span class="daily-taskbar-label">🗓️ DAILY · ' + esc(state.daily.date) + '</span><div class="daily-taskbar-chips">' +
+      tasks.map(function(t) { var yes = has(state.daily.actions, t[0]); return '<span class="daily-taskbar-chip' + (yes ? " done" : "") + '" title="' + esc(t[3]) + '">' + t[1] + " " + esc(t[2]) + (yes ? " ✓" : "") + "</span>"; }).join("") +
+      '</div><span class="daily-taskbar-progress" role="progressbar" aria-valuenow="' + Math.round(n / total * 100) + '" aria-valuemin="0" aria-valuemax="100"><i style="width:' + Math.round(n / total * 100) + '%"></i></span>' +
+      '<button type="button" class="daily-taskbar-claim" data-action="claim-daily"' + (!done || state.daily.claimed ? " disabled" : "") + ">" + (state.daily.claimed ? "Claimed ✓" : (done ? "Claim +80 XP" : n + "/" + total)) + '</button><button type="button" class="daily-taskbar-more" data-nav="daily">Details →</button></div>';
+  }
   function dailyBanner() {
-    var n = dailyCount();
-    return '<button class="dev-daily-banner" data-module="daily"><span class="daily-banner-icon">🗓️</span><span class="daily-banner-copy"><strong>Today’s tiny quest</strong><small>' + n + '/3 done · mission + reel + story</small></span><span class="daily-banner-progress"><i style="width:' + Math.round(n / 3 * 100) + '%"></i></span><b>' + (state.daily.claimed ? '🎉 Claimed' : (n === 3 ? '+80 XP' : 'Let’s go →')) + '</b></button>';
+    var n = dailyCount(), total = dailyTaskDefs().length;
+    return '<button class="dev-daily-banner" data-nav="daily"><span class="daily-banner-icon">🗓️</span><span class="daily-banner-copy"><strong>Today’s tiny quest</strong><small>' + n + "/" + total + ' done · +80 XP bonus</small></span><span class="daily-banner-progress"><i style="width:' + Math.round(n / total * 100) + '%"></i></span><b>' + (state.daily.claimed ? "🎉 Claimed" : (n === total ? "+80 XP" : "Let’s go →")) + "</b></button>";
   }
   function moduleCard(id, icon, title, tag, desc, status) {
     return '<button class="lab-module-card ' + id + '-module" data-module="' + id + '"><span class="lab-module-icon">' + icon + '</span><span class="lab-module-tag">' + tag + '</span><strong>' + title + '</strong><small>' + desc + '</small><span class="lab-module-go">' + status + ' →</span></button>';
@@ -474,11 +627,11 @@
     return { message: "🎉 You watched all " + result.comparisons + " comparisons and " + result.swaps + " swaps. +40 XP and the Sort Sprinter badge!" };
   }
   function dailyPage() {
-    var n = dailyCount(), done = n === DAILY_TASKS.length;
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">FRESH CHECKLIST · ' + esc(state.daily.date) + '</span><h1>Today’s tiny quest 🗓️</h1><p>Three small actions. Your streak grows one good day at a time.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section>' +
-      '<section class="daily-hero"><div class="daily-sun">🌞</div><div><span class="dev-eyebrow">PIP’S DAILY DASH</span><h2>' + n + ' / 3 little wins</h2><p>Complete all three, then open your +80 XP reward.</p><div class="daily-big-track"><i style="width:' + Math.round(n / 3 * 100) + '%"></i></div></div><div class="daily-stamp">' + (state.daily.claimed ? '🎁<small>CLAIMED</small>' : (done ? '🎁<small>READY!</small>' : '✨<small>IN PROGRESS</small>')) + '</div></section>' +
-      '<div class="daily-task-list">' + DAILY_TASKS.map(function(t) { var yes = has(state.daily.actions, t[0]); return '<div class="daily-task ' + (yes ? 'task-done' : '') + '"><span class="daily-task-icon">' + t[1] + '</span><div><strong>' + t[2] + '</strong><small>' + t[3] + '</small></div><span class="daily-task-state">' + (yes ? '✓ DONE' : 'NOT YET') + '</span><button class="secondary-button" data-module="' + (t[0] === 'mission' ? 'map' : (t[0] === 'reel' ? 'reels' : 'sim')) + '">' + (yes ? 'Again' : 'Go') + ' →</button></div>'; }).join('') + '</div>' +
-      '<div class="daily-reward-row"><span>🎁 Finish all 3 to claim</span><button class="primary-button" data-action="claim-daily"' + (!done || state.daily.claimed ? ' disabled' : '') + '>' + (state.daily.claimed ? 'Reward claimed ✓' : 'Claim +80 XP') + '</button></div>';
+    var tasks = dailyTaskDefs(), total = tasks.length, n = dailyCount(), done = n === total;
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">FRESH CHECKLIST · ' + esc(state.daily.date) + '</span><h1>Today’s tiny quest 🗓️</h1><p>Three small actions. Your streak grows one good day at a time.</p></div><button class="dev-link" data-nav="' + (LAB_ENABLED ? "lab" : "home") + '">← ' + (LAB_ENABLED ? "Play Lab" : "Home") + '</button></section>' +
+      '<section class="daily-hero"><div class="daily-sun">🌞</div><div><span class="dev-eyebrow">PIP’S DAILY DASH</span><h2>' + n + " / " + total + ' little wins</h2><p>Complete all three, then open your +80 XP reward.</p><div class="daily-big-track"><i style="width:' + Math.round(n / total * 100) + '%"></i></div></div><div class="daily-stamp">' + (state.daily.claimed ? '🎁<small>CLAIMED</small>' : (done ? '🎁<small>READY!</small>' : '✨<small>IN PROGRESS</small>')) + '</div></section>' +
+      '<div class="daily-task-list">' + tasks.map(function(t) { var yes = has(state.daily.actions, t[0]); return '<div class="daily-task ' + (yes ? 'task-done' : '') + '"><span class="daily-task-icon">' + t[1] + '</span><div><strong>' + t[2] + '</strong><small>' + t[3] + '</small></div><span class="daily-task-state">' + (yes ? '✓ DONE' : 'NOT YET') + '</span><button class="secondary-button" data-nav="' + dailyTaskDest(t[0]) + '">' + (yes ? 'Again' : 'Go') + ' →</button></div>'; }).join('') + '</div>' +
+      '<div class="daily-reward-row"><span>🎁 Finish all ' + total + ' to claim</span><button class="primary-button" data-action="claim-daily"' + (!done || state.daily.claimed ? ' disabled' : '') + '>' + (state.daily.claimed ? 'Reward claimed ✓' : 'Claim +80 XP') + '</button></div>';
   }
   function reelsPage() {
     var r = REELS[reelIndex], completed = has(state.reels, r.id), answered = reelAnswer !== null;
@@ -500,19 +653,36 @@
       (s.last ? '<div class="sim-last-feedback">💬 ' + esc(s.last) + '</div>' : '') +
       '<section class="sim-scene"><div class="sim-scene-person">' + (i === 0 ? '🧑‍💻' : (i === 1 ? '🧑‍🤝‍🧑' : '🦊')) + '</div><span class="dev-eyebrow">' + step.speaker + '</span><h2>' + step.text + '</h2><div class="sim-options">' + step.options.map(function(x, j) { return '<button class="sim-option" data-sim-choice="' + j + '"><span>' + String.fromCharCode(65 + j) + '</span>' + x + '<b>→</b></button>'; }).join('') + '</div><small class="sim-score-hint">Current team points: ' + s.score + ' · pick what you’d really do.</small></section>';
   }
-  function badgeList() {
+  function achievementList() {
     var anySkill = SKILLS.some(function(k) { return levelInfo(state.skills[k.id], SKILL_AT).n >= 2; });
+    var scenarios = Object.keys(state.scenarios).length;
+    var techCleared = CHAL.filter(function(c) { return techDone(c.id); }).length;
+    var firstTask = scenarios > 0 || CHAL.some(function(c) { return techBest(c.id) > 0; });
     return [
-      { icon: '🪄', title: 'First Spark', desc: 'Finish your first scenario.', unlocked: Object.keys(state.scenarios).length > 0 },
-      { icon: '🌈', title: 'Well-Rounded', desc: 'Earn XP in all six skills.', unlocked: SKILLS.every(function(k) { return state.skills[k.id] > 0; }) },
-      { icon: '💻', title: 'Tech Starter', desc: 'Clear your first technical challenge.', unlocked: CHAL.some(function(x) { return techDone(x.id); }) },
-      { icon: '🌱', title: 'Rising Skill', desc: 'Reach Level 2 in any skill.', unlocked: anySkill },
-      { icon: '📼', title: 'Pocket Professor', desc: 'Collect all three Knowledge Reels.', unlocked: state.reels.length >= REELS.length },
-      { icon: '🎭', title: 'Calm in the Chaos', desc: 'Finish the workplace simulator.', unlocked: state.simulator.done },
-      { icon: '🔎', title: 'Search Savant', desc: 'Finish a Binary Search.', unlocked: state.sortLab.binary.done },
-      { icon: '🫧', title: 'Sort Sprinter', desc: 'Watch the whole Bubble Sort Lab.', unlocked: state.sortLab.bubble.done },
-      { icon: '🎁', title: 'Daily Dynamo', desc: 'Claim the daily quest reward.', unlocked: state.daily.claimed }
+      { icon: "🎯", title: "First task complete", desc: "Finish your first scenario or technical challenge.", unlocked: firstTask },
+      { icon: "📖", title: "Concept collector", desc: "Complete your first interactive lesson.", unlocked: Object.keys(state.lessons).length > 0 },
+      { icon: "⚡", title: "XP spark", desc: "Earn 50 total XP.", unlocked: state.xp >= 50 },
+      { icon: "🏅", title: "Level 2 explorer", desc: "Reach player level 2.", unlocked: playerLevel().n >= 2 },
+      { icon: "💻", title: "Challenge cleared", desc: "Score 60% or higher on a technical challenge.", unlocked: techCleared > 0 },
+      { icon: "🗺️", title: "Map momentum", desc: "Clear 3 technical challenges.", unlocked: techCleared >= 3 },
+      { icon: "🪄", title: "First Spark", desc: "Finish your first soft-skill scenario.", unlocked: scenarios > 0 },
+      { icon: "🌈", title: "Well-Rounded", desc: "Earn XP in all six soft skills.", unlocked: SKILLS.every(function(k) { return state.skills[k.id] > 0; }) },
+      { icon: "🌱", title: "Rising Skill", desc: "Reach Level 2 in any skill.", unlocked: anySkill },
+      { icon: "🎁", title: "Daily Dynamo", desc: "Claim today’s daily quest reward.", unlocked: state.daily.claimed },
+      { icon: "📼", title: "Pocket Professor", desc: "Collect all three Knowledge Reels.", unlocked: state.reels.length >= REELS.length },
+      { icon: "🎭", title: "Calm in the Chaos", desc: "Finish the workplace simulator.", unlocked: state.simulator.done },
+      { icon: "🔎", title: "Search Savant", desc: "Finish a Binary Search lab.", unlocked: state.sortLab.binary.done },
+      { icon: "🫧", title: "Sort Sprinter", desc: "Watch the whole Bubble Sort lab.", unlocked: state.sortLab.bubble.done }
     ];
+  }
+  function achievementsPage() {
+    var list = achievementList(), unlocked = list.filter(function(a) { return a.unlocked; }).length;
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">MILESTONES</span><h1>Achievements 🏅</h1><p>' + unlocked + " of " + list.length + ' unlocked. Small wins add up across the Game Map and Play Lab.</p></div><button class="dev-link" data-nav="home">← Home</button></section><div class="badge-grid">' +
+      list.map(function(a) { return '<article class="badge-card ' + (a.unlocked ? "unlocked" : "locked") + '"><span>' + a.icon + '</span><strong>' + esc(a.title) + '</strong><small>' + esc(a.desc) + '</small><b>' + (a.unlocked ? "UNLOCKED ✓" : "LOCKED 🔒") + "</b></article>"; }).join("") + "</div>";
+  }
+  function badgeList() {
+    var titles = ["First Spark", "Well-Rounded", "Challenge cleared", "Rising Skill", "Pocket Professor", "Calm in the Chaos", "Search Savant", "Sort Sprinter", "Daily Dynamo"];
+    return achievementList().filter(function(a) { return titles.indexOf(a.title) >= 0; });
   }
   function badgesPage() {
     var list = badgeList(), unlocked = list.filter(function(b) { return b.unlocked; }).length;
@@ -528,7 +698,7 @@
   }
   function claimDaily() {
     if (state.daily.claimed) { say('You already claimed today’s reward.'); return; }
-    if (dailyCount() < DAILY_TASKS.length) { say('Finish all three little wins first.'); return; }
+    if (dailyCount() < dailyTaskDefs().length) { say("Finish all three little wins first."); return; }
     state.daily.claimed = true; state.xp += 80; save(); draw(); say('Daily quest complete! +80 XP');
   }
   function chooseSim(index) {
@@ -571,6 +741,22 @@
       var row = r.length === 3 && r.every(function(x) { return Math.abs(x.top - r[0].top) <= 1; }) && r[1].left > r[0].left && r[2].left > r[1].left;
       var gap = row && Math.abs(r[1].left - r[0].right - 16) <= 1 && Math.abs(r[2].left - r[1].right - 16) <= 1;
       return [{ label: "Cards sit side by side", ok: !!row }, { label: "16px gap between the cards", ok: !!gap }];
+    },
+    "column-stack": function(doc) {
+      var r = [].map.call(doc.querySelectorAll(".card"), function(el) { return el.getBoundingClientRect(); });
+      var stacked = r.length >= 2 && r[1].top >= r[0].bottom - 2 && Math.abs(r[0].left - r[1].left) <= 2;
+      var gap = stacked && Math.abs(r[1].top - r[0].bottom - 12) <= 2;
+      return [{ label: "Cards stack vertically", ok: !!stacked }, { label: "12px gap between cards", ok: !!gap }];
+    },
+    "bold-heading": function(doc) {
+      var h = doc.querySelector(".hero");
+      if (!h) return [{ label: "Heading is bold", ok: false }, { label: "Heading uses coral color", ok: false }];
+      var style = doc.defaultView.getComputedStyle(h);
+      var weight = parseInt(style.fontWeight, 10);
+      var bold = weight >= 600 || style.fontWeight === "bold";
+      var rgb = style.color.match(/\d+/g) || [];
+      var coral = rgb.length >= 3 && Math.abs(+rgb[0] - 244) <= 25 && Math.abs(+rgb[1] - 123) <= 25 && Math.abs(+rgb[2] - 103) <= 25;
+      return [{ label: "Heading is bold", ok: bold }, { label: "Heading uses coral (#f47b67)", ok: coral }];
     }
   };
   function liveDoc(c, css) {
@@ -724,14 +910,14 @@
     var L = LESSONS[c.id], learned = !!state.lessons[c.id], ready = lessonDone(L);
     root.innerHTML = '<div class="sk sk-scenario"><button type="button" class="back-link" data-nav="techskill">← Back to ' + esc(SKILL_BY_ID[c.skill].name) + '</button><section class="sk-scene"><span class="sk-eyebrow">' + esc(SKILL_BY_ID[c.skill].name.toUpperCase()) + ' · LEARN FIRST</span><h1>📖 ' + esc(L.title) + '</h1><p class="sk-situation">' + esc(L.intro) + '</p>' + lessonBody(L) +
       '<div class="sk-insight sk-key"><span class="sk-eyebrow">KEY IDEA</span><p>' + esc(L.key) + '</p></div><div class="sk-actions"><button type="button" class="primary-button" data-action="lesson-done"' + (ready ? "" : " disabled") + '>' + (c.trail ? (learned ? "Back to JavaScript →" : "Got it — back to JavaScript →") : (learned ? "Start the challenge →" : "Got it — start the challenge →")) + '</button><button type="button" class="secondary-button" data-action="lesson-skip">' + (learned ? "Skip" : "Skip lesson") + '</button></div>' +
-      (learned ? "" : '<p class="sk-hint">Finish the lesson to earn +10 ' + esc(SKILL_BY_ID[c.skill].name) + ' XP.</p>') + '</section></div>';
+      (learned ? "" : '<p class="sk-hint">Finish the lesson to earn +10 XP in ' + esc(SKILL_BY_ID[c.skill].name) + ".</p>") + "</section></div>";
   }
   function completeLesson(c, skipped) {
     stopLessonPlay();
     if (!skipped && lessonDone(LESSONS[c.id]) && !state.lessons[c.id]) {
       var before = levelInfo(state.skills[c.skill], SKILL_AT).n, playerBefore = playerLevel().n;
-      state.lessons[c.id] = true; state.skills[c.skill] += 10; state.xp += 10;
-      var msg = "Concept learned! +10 " + SKILL_BY_ID[c.skill].name + " XP";
+      state.lessons[c.id] = true; state.skills[c.skill] += 10; state.xp += 10; trackDaily("learn");
+      var msg = "Concept learned! +10 XP · " + SKILL_BY_ID[c.skill].name;
       if (levelInfo(state.skills[c.skill], SKILL_AT).n > before) msg += " · " + SKILL_BY_ID[c.skill].name + " reached Level " + levelInfo(state.skills[c.skill], SKILL_AT).n;
       else if (playerLevel().n > playerBefore) msg += " · Player Level " + playerLevel().n + "!";
       save(); say(msg);
@@ -793,6 +979,7 @@
         if (playerLevel().n > playerBefore) levelUps.push("You reached Player Level " + playerLevel().n + " — " + playerLevel().name);
       }
       state.tech[c.id] = best; trackDaily("mission");
+      if (best >= 60 && old < 60) trackDaily("clear");
       session.result = { score: score, best: best, gain: gain, levelUps: levelUps, tests: res.tests, goals: res.goals };
       save();
       if (state.sound && score >= 60) beep();
@@ -891,6 +1078,8 @@
     var accountModeButton = e.target.closest("[data-account-mode]");
     if (accountModeButton) { renderAuth(accountModeButton.dataset.accountMode); return; }
     if (e.target.id === "account-modal-root" || e.target.classList.contains("account-backdrop")) { closeAccountModal(); return; }
+    var miniBack = e.target.closest("[data-mini-back]");
+    if (miniBack) { e.preventDefault(); go(miniBack.getAttribute("data-mini-back") || "minigames"); return; }
     var nav = e.target.closest("[data-nav]");
     if (nav) { e.preventDefault(); if (nav.dataset.nav === "map" && nav.closest(".sidebar")) track = getSettings().mapStart === "core" ? "core" : "tech"; go(nav.dataset.nav); return; }
     var moduleButton = e.target.closest("[data-module]");
@@ -997,4 +1186,5 @@
   applySettings(getSettings());
   syncThemeUi();
   initAccount();
+  window.XPeditionGo = go;
 })(); 

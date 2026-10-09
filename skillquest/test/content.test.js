@@ -43,7 +43,7 @@ test("every challenge is well formed and has a lesson", () => {
     else if (c.kind === "arrange") assert.ok(isPermutation(c.answer, c.items.length), c.id);
     else if (c.kind === "match") assert.ok(isPermutation(c.rightOrder, c.pairs.length), c.id);
     else if (c.kind === "fill") assert.strictEqual(c.code.join("\n").split("___").length - 1 || c.blanks.length, c.blanks.length, c.id);
-    else if (c.kind === "live") assert.ok(["center", "row-gap"].includes(c.check) && c.html && c.starter, c.id);
+    else if (c.kind === "live") assert.ok(["center", "row-gap", "column-stack", "bold-heading"].includes(c.check) && c.html && c.starter, c.id);
     else if (c.kind === "run") { assert.ok(c.fn && c.starter && c.tests.length > 0, c.id); assert.ok(new RegExp("function\\s+" + c.fn + "\\b").test(c.starter), c.id); }
     else assert.fail("unknown kind " + c.kind + " in " + c.id);
   }
@@ -61,7 +61,9 @@ test("lessons reference real code lines", () => {
 test("reference solutions pass the JavaScript challenge tests", () => {
   const solutions = {
     "js-fix-function": "function total(prices) { let s = 0; for (let i = 0; i < prices.length; i++) s += prices[i]; return s; }",
-    "js-write-function": "function isEven(n) { return n % 2 === 0; }"
+    "js-write-function": "function isEven(n) { return n % 2 === 0; }",
+    "js-cap-values": "function capAt(nums, max) { return nums.map(n => n > max ? max : n); }",
+    "js-count-truthy": "function countActive(flags) { return flags.filter(Boolean).length; }"
   };
   for (const c of content.challenges.filter(x => x.kind === "run")) {
     const fn = new Function(solutions[c.id] + "\nreturn " + c.fn + ";")();

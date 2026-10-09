@@ -4,7 +4,7 @@
      buildSteps() turns the algorithm into frames; the UI only renders frame N,
      so play, pause, step back and scrubbing all share one code path.
      Usage: SkillQuestBubbleSort.mount(hostElement, { alreadyDone, onComplete }); .unmount() */
-  var STEP = 44, BAR_W = 34, SIZE = 8, CARD_W = 420, DEFAULT_VALUES = [3, 2, 7, 8, 5, 4, 1, 6];
+  var STEP = 44, BAR_W = 34, MIN_N = 3, MAX_N = 12, DEFAULT_CARD_W = 420, DEFAULT_VALUES = [3, 2, 7, 8, 5, 4, 1, 6];
   var CODE = [
     '<span class="bs-k">def</span> <span class="bs-f">bubble_sort</span>(a):',
     '    n = <span class="bs-f">len</span>(a)',
@@ -52,8 +52,8 @@
           '<select id="bs-speed" class="bs-select" data-role="speed"><option value="1.6">0.5×</option><option value="1" selected>1×</option><option value="0.55">2×</option><option value="0.3">4×</option></select>' +
         '</div>' +
         '<form class="bs-row bs-custom" data-role="form" novalidate>' +
-          '<label class="bs-visually-hidden" for="bs-values">Eight numbers from 1 to 8, comma separated</label>' +
-          '<input id="bs-values" class="bs-input" data-role="values" value="' + DEFAULT_VALUES.join(",") + '" inputmode="numeric" autocomplete="off" spellcheck="false">' +
+          '<label class="bs-visually-hidden" for="bs-values">Numbers to sort, comma separated (' + MIN_N + "-" + MAX_N + ' values)</label>' +
+          '<input id="bs-values" class="bs-input" data-role="values" value="' + DEFAULT_VALUES.join(",") + '" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="e.g. 3,2,7,8,5">' +
           '<button type="submit" class="secondary-button">Load</button><button type="button" class="secondary-button" data-role="shuffle">Shuffle</button>' +
         '</form>' +
         '<p class="bs-error" data-role="error" role="alert"></p>' +
@@ -104,24 +104,46 @@
     var el = {};
     root.querySelectorAll("[data-role]").forEach(function(node) { el[node.dataset.role] = node; });
     var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    var vals = DEFAULT_VALUES.slice(), steps = [], cur = 0, reached = 0, timer = null, scale = 1, completed = false, resizeObs = null;
+    var vals = DEFAULT_VALUES.slice(), steps = [], cur = 0, reached = 0, timer = null, scale = 1, completed = false, resizeObs = null, cardW = DEFAULT_CARD_W;
 
     function speedMs() { return 900 * parseFloat(el.speed.value); }
     function setDur() { root.style.setProperty("--dur", (reduceMotion ? 0 : Math.min(450, speedMs() * 0.5)) + "ms"); }
 
+    function layoutWidth(n) {
+      return Math.max(DEFAULT_CARD_W, n * STEP + 96);
+    }
+
+    function barHeight(v, maxV) {
+      var cap = Math.max(maxV, 1);
+      return Math.round(28 + (v / cap) * 88);
+    }
+
+    function applyCardWidth(w) {
+      cardW = w;
+      el.fit.style.width = cardW + "px";
+      el.scene.style.width = cardW + "px";
+      el.bars.style.width = cardW + "px";
+      el.slots.style.width = cardW + "px";
+      var platform = el.scene.querySelector(".bs-platform");
+      if (platform) platform.style.setProperty("--w", Math.max(120, vals.length * STEP + 48) + "px");
+    }
+
     function buildScene() {
       el.bars.innerHTML = ""; el.slots.innerHTML = "";
-      var baseLeft = CARD_W / 2 - 3.5 * STEP - BAR_W / 2;
+      var n = vals.length, maxV = Math.max.apply(null, vals);
+      applyCardWidth(layoutWidth(n));
+      var firstSlot = cardW / 2 - ((n - 1) * STEP) / 2;
+      var baseLeft = firstSlot - BAR_W / 2;
       vals.forEach(function(v, id) {
-        var h = 22 + v * 11, bar = document.createElement("div");
+        var h = barHeight(v, maxV), bar = document.createElement("div");
         bar.className = "bs-box bs-bar"; bar.dataset.id = id;
         bar.style.cssText = "--h:" + h + "px;left:" + baseLeft + "px;top:" + (-h) + "px";
         bar.innerHTML = '<div class="bs-cube bs-box" style="--w:' + BAR_W + 'px;--h:' + h + 'px;--d:34px;left:0;top:0"><i class="bs-fr">' + v + '</i><i class="bs-tp"></i><i class="bs-rt"></i></div>';
         el.bars.appendChild(bar);
       });
-      for (var i = 0; i < vals.length; i++) {
+      for (var i = 0; i < n; i++) {
         var slot = document.createElement("div"); slot.className = "bs-slot";
-        slot.style.left = (CARD_W / 2 - 3.5 * STEP + i * STEP) + "px"; el.slots.appendChild(slot);
+        slot.style.left = (firstSlot + i * STEP) + "px"; el.slots.appendChild(slot);
       }
       el.code.innerHTML = CODE.map(function(line, i) { return '<span class="bs-ln" data-l="' + (i + 1) + '"><i>' + (i + 1) + '</i>' + line + '</span>'; }).join("");
     }
@@ -130,6 +152,7 @@
       stop(); vals = newVals; steps = buildSteps(vals); cur = 0; reached = 0;
       buildScene(); el.seek.max = steps.length - 1; el.tot.textContent = steps.length - 1;
       render(0, false);
+      fit();
     }
 
     function render(idx, animate) {
@@ -176,7 +199,8 @@
       var a = el.slots.children[Math.floor(slotIdx)].getBoundingClientRect(), b = el.slots.children[Math.ceil(slotIdx)].getBoundingClientRect();
       var x = ((a.left + b.left) / 2 - sr.left) / scale;
       var ids = s.active.length ? s.active.map(function(i) { return s.order[i]; }) : s.order;
-      var hMax = Math.max.apply(null, ids.map(function(id) { return 22 + vals[id] * 11; }));
+      var maxV = Math.max.apply(null, vals);
+      var hMax = Math.max.apply(null, ids.map(function(id) { return barHeight(vals[id], maxV); }));
       var hover = s.kind === "swap" ? 14 : (s.kind === "cmp" ? 26 : 50);
       var y = (a.top - sr.top) / scale - hMax * 0.8 - 92 - hover;
       mascot.style.left = x + "px";
@@ -199,9 +223,10 @@
     function toggle() { if (timer) stop(); else play(); }
 
     function parseValues(text) {
-      var parts = text.split(",").map(function(x) { return x.trim(); });
+      var parts = text.split(",").map(function(x) { return x.trim(); }).filter(function(x) { return x.length; });
+      if (parts.length < MIN_N || parts.length > MAX_N) return null;
       var nums = parts.map(function(x) { return /^\d+$/.test(x) ? parseInt(x, 10) : NaN; });
-      if (nums.length !== SIZE || nums.some(function(x) { return !(x >= 1 && x <= SIZE); })) return null;
+      if (nums.some(function(x) { return !(x >= 1 && x <= 999); })) return null;
       return nums;
     }
     function setError(text) { el.error.textContent = text || ""; el.values.setAttribute("aria-invalid", text ? "true" : "false"); }
@@ -213,14 +238,16 @@
     el.seek.addEventListener("input", function(e) { stop(); render(+e.target.value, false); });
     el.speed.addEventListener("change", setDur);
     el.shuffle.addEventListener("click", function() {
-      var a = [1, 2, 3, 4, 5, 6, 7, 8];
+      var n = MIN_N + Math.floor(Math.random() * (MAX_N - MIN_N + 1));
+      var a = [];
+      for (var k = 0; k < n; k++) a.push(1 + Math.floor(Math.random() * Math.max(n * 2, 12)));
       for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; }
       el.values.value = a.join(","); setError(""); init(a);
     });
     el.form.addEventListener("submit", function(e) {
       e.preventDefault();
       var nums = parseValues(el.values.value);
-      if (!nums) { setError("Enter exactly 8 whole numbers between 1 and 8, separated by commas."); return; }
+      if (!nums) { setError("Enter " + MIN_N + "–" + MAX_N + " whole numbers (1–999), separated by commas."); return; }
       setError(""); init(nums);
     });
     function onKey(e) {
@@ -235,11 +262,11 @@
     document.addEventListener("keydown", onKey);
 
     function fit() {
-      var width = host.clientWidth || CARD_W;
-      scale = Math.min(1, width / CARD_W);
+      var width = host.clientWidth || cardW;
+      scale = Math.min(1, width / cardW);
       el.fit.style.transform = "scale(" + scale + ")";
       el.fit.style.marginBottom = (-(1 - scale) * el.fit.offsetHeight) + "px";
-      el.controls.style.width = Math.min(CARD_W, width) + "px";
+      el.controls.style.width = Math.min(cardW, width) + "px";
       if (steps.length) placeMascot(steps[cur]);
     }
     if (window.ResizeObserver) { resizeObs = new ResizeObserver(fit); resizeObs.observe(host); }
