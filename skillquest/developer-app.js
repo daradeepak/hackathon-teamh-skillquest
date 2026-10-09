@@ -1,5 +1,6 @@
 (function() {
   "use strict";
+  var AI = window.XPAICheck || null; /* AI Code Check + JavaScript Trail module (aicheck-app.js) */
   var D = window.DEVQUEST_CONTENT, SKILLS = D.skills, SCEN = D.scenarios, TECH = D.techSkills, CHAL = D.challenges, LESSONS = D.lessons, root = document.getElementById("app-main");
   var label = document.getElementById("page-label"), toast = document.getElementById("toast");
   var BASE_KEY = "skillquest-devcore-v1", KEY = BASE_KEY, view = "home", current = null, track = "tech", hint = false;
@@ -23,7 +24,8 @@
   function blankProgress(name) {
     return { name: name || "Learner", avatar: "", xp: 0, sound: false, skills: zeroSkills(), scenarios: {}, tech: {}, lessons: {}, daily: { date: dayKey(), actions: [], claimed: false },
       reels: [], sortLab: sortLabOf(), simulator: { stage: 0, score: 0, done: false, last: "", choices: [], reward: 0 },
-      minigames: { matchBest: 0, truthBest: 0, bracketBest: 0, memoryBestEasy: 0, memoryBestMedium: 0, memoryBestHard: 0, gitlineBest: 0, kebabBest: 0, statusBest: 0, xpBanked: 0 } };
+      minigames: { matchBest: 0, truthBest: 0, bracketBest: 0, memoryBestEasy: 0, memoryBestMedium: 0, memoryBestHard: 0, gitlineBest: 0, kebabBest: 0, statusBest: 0, xpBanked: 0 },
+      aicheck: AI ? AI.blank() : {}, jsLessons: [] };
   }
   /* Accepts saved progress from this or an older version and keeps only values that are still valid. */
   function normalize(p, name) {
@@ -41,6 +43,7 @@
     var mg = p.minigames && typeof p.minigames === "object" ? p.minigames : {};
     return Object.assign(base, { lessons: learned, avatar: AVATAR_RE.test(p.avatar) ? p.avatar : "", tech: tech, xp: Math.max(0, Math.floor(Number(p.xp)) || 0), sound: !!p.sound, skills: skills, scenarios: chosen,
       reels: Array.isArray(p.reels) ? p.reels : [], sortLab: sortLabOf(p.sortLab), daily: Object.assign(base.daily, p.daily || {}), simulator: Object.assign(base.simulator, p.simulator || {}),
+      aicheck: AI ? AI.normalize(p.aicheck) : base.aicheck, jsLessons: AI ? AI.normalizeLessons(p.jsLessons) : [],
       minigames: { matchBest: Math.max(0, Math.floor(Number(mg.matchBest)) || 0), truthBest: Math.max(0, Math.floor(Number(mg.truthBest)) || 0), bracketBest: Math.max(0, Math.floor(Number(mg.bracketBest)) || 0), memoryBestEasy: Math.max(0, Math.floor(Number(mg.memoryBestEasy)) || 0), memoryBestMedium: Math.max(0, Math.floor(Number(mg.memoryBestMedium)) || 0), memoryBestHard: Math.max(0, Math.floor(Number(mg.memoryBestHard)) || 0, Math.floor(Number(mg.memoryBest)) || 0), gitlineBest: Math.max(0, Math.floor(Number(mg.gitlineBest)) || 0), kebabBest: Math.max(0, Math.floor(Number(mg.kebabBest)) || 0), statusBest: Math.max(0, Math.floor(Number(mg.statusBest)) || 0), xpBanked: Math.max(0, Math.floor(Number(mg.xpBanked)) || 0) } });
   }
   function seed() { return blankProgress("Learner"); }
@@ -378,8 +381,9 @@
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
+    else if (AI && AI.VIEWS.indexOf(view) >= 0) { label.textContent = AI.label(view); AI.render(view); }
     else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || TRAIL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search", "reverse"].indexOf(view) >= 0)); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill" || (AI && AI.MAP_VIEWS.indexOf(view) >= 0)) && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && (["dsa", "sort", "search", "reverse"].indexOf(view) >= 0 || (AI && AI.ANIM_VIEWS.indexOf(view) >= 0)))); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (view === "search") mountSearchLab(); else if (window.XPBinarySearch) window.XPBinarySearch.unmount();
     if (view === "reverse") mountReverseLab(); else if (window.XPReverseString) window.XPReverseString.unmount();
@@ -395,10 +399,11 @@
     root.innerHTML =
       '<section class="dev-welcome"><div class="dev-wave">👋</div><div class="dev-welcome-copy"><span class="dev-eyebrow">SOFT SKILLS</span><h1>Hey ' + esc(state.name) + '! Ready to practice a real-life moment?</h1><p>Short scenarios that build the people skills great teams run on.</p></div><div class="dev-top-stats"><span class="dev-chip xp-chip">⚡ ' + state.xp + ' XP</span><span class="dev-chip">🏅 Level ' + pl.n + ' · ' + esc(pl.name) + '</span></div></section>' +
       '<section class="dev-hero"><div class="dev-hero-copy"><span class="dev-hero-tag">💬 NEXT UP · ' + esc(next.title.toUpperCase()) + '</span><h2>What would you do<br>in this moment?</h2><p>Read a short workplace scenario and choose the approach that feels like you. There are no wrong answers. Each choice builds different skills.</p><button class="primary-button dev-play-button" data-action="continue">Play next scenario →</button></div><div class="dev-hero-art"><div class="dev-orbit"></div><div class="dev-mascot">🦊</div><div class="dev-speech">Pip: how would that land?</div><span class="dev-float f1">✨ ' + done + '/' + total + ' played</span><span class="dev-float f2">+ XP</span></div></section>' +
-      '<section class="dev-bottom-grid home-teasers"><div class="dev-panel teaser-panel"><span class="dev-eyebrow">PLAY LAB</span><h3>🧮 Watch algorithms move</h3><p>Step through Bubble Sort and Binary Search with the real code beside the animation.</p><button class="secondary-button" data-nav="anim">Open Play Lab →</button></div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>💻 Technical Skills</h3><p>Game-style challenges in HTML, CSS and JavaScript. Earn XP for every one you crack.</p><button class="secondary-button" data-action="tech">Open Technical Skills →</button></div></section>';
+      '<section class="dev-bottom-grid home-teasers"><div class="dev-panel teaser-panel"><span class="dev-eyebrow">PLAY LAB</span><h3>🧮 Watch algorithms move</h3><p>Step through Bubble Sort and Binary Search with the real code beside the animation.</p><button class="secondary-button" data-nav="anim">Open Play Lab →</button></div><div class="dev-panel teaser-panel"><span class="dev-eyebrow">ALSO ON THE MAP</span><h3>💻 Technical Skills</h3><p>Game-style challenges in HTML, CSS and JavaScript. Earn XP for every one you crack.</p><button class="secondary-button" data-action="tech">Open Technical Skills →</button>' + (AI ? ' <button class="secondary-button" data-ai-open="map">AI Code Check →</button>' : "") + '</div></section>';
+    if (AI) root.insertAdjacentHTML("afterbegin", AI.homeCard()); /* Merge Defender first */
   }
   function trackTabs(active) {
-    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button></div>';
+    return '<div class="dev-track-tabs"><button class="track-tab ' + (active === "tech" ? "is-active" : "") + '" data-action="tech">Technical Skills</button><button class="track-tab ' + (active === "core" ? "is-active" : "") + '" data-action="core">Soft Skills</button>' + (AI ? '<button class="track-tab ' + (active === "ai" ? "is-active" : "") + '" data-ai-open="map">AI Code Check</button>' : "") + '</div>';
   }
   var SOFT_CARD_ACCENTS = {
     leadership: "sk-tech-card--leadership", communication: "sk-tech-card--communication", "problem-solving": "sk-tech-card--problem",
@@ -529,6 +534,7 @@
       '<section class="dev-stats-hero"><div><span class="dev-rank-pill">🏅 ' + esc(pl.name) + '</span><h2>' + state.xp + ' <small>XP</small></h2><p>Keep exploring different approaches. Every choice builds something.</p></div><div class="dev-stat-stack"><div><strong>🏅 ' + pl.n + '</strong><span>player level</span></div><div><strong>🎯 ' + list.length + '/' + SCEN.length + '</strong><span>scenarios played</span></div><div><strong>⭐ ' + (state.skills[top.id] ? esc(top.name) : "—") + '</strong><span>top skill</span></div></div></section>' +
       '<div class="dev-stats-grid"><section class="dev-panel"><div class="dev-panel-head"><h3>🧠 Skill levels</h3><span>XP by skill</span></div>' + SKILLS.map(skillRow).join("") + '<div class="dev-panel-head sk-subhead"><h3>💻 Technical skills</h3></div>' + TECH.map(skillRow).join("") + '</section>' +
       '<section class="dev-panel"><div class="dev-panel-head"><h3>🗒️ Recent scenarios</h3><span>Your approach</span></div>' + (list.length ? list.slice(-6).reverse().map(function(x) { return '<div class="score-row"><span>' + esc(x.title) + '</span><b>' + String.fromCharCode(65 + state.scenarios[x.id]) + '</b></div>'; }).join("") : '<p class="dev-muted">Play a scenario and your choices show up here.</p>') + '</section></div><p class="dev-fineprint">All progress stays in this browser unless you sign in to a local account.</p>';
+    var statsHero = root.querySelector(".dev-stats-hero"); if (AI && statsHero) statsHero.insertAdjacentHTML("afterend", AI.progressCard());
   }
   var DAILY_LAB_TASKS = [
     ["mission", "🎮", "Play a skill mission", "Any code challenge counts."],
@@ -586,7 +592,9 @@
   function algosDone() { return ALGOS.filter(function(a) { return a.done(); }).length; }
   function animatedPage() {
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Play Lab 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
-      '<div class="lab-module-grid">' + moduleCard("dsa", "🧮", "DSA", "DATA STRUCTURES & ALGORITHMS", "Step through classic algorithms with the real code beside the animation.", algosDone() + " of " + ALGOS.length + " completed") + '</div>' +
+      '<div class="lab-module-grid">' + moduleCard("dsa", "🧮", "DSA", "DATA STRUCTURES & ALGORITHMS", "Step through classic algorithms with the real code beside the animation.", algosDone() + " of " + ALGOS.length + " completed") +
+      (AI ? moduleCard("jstrail", "🌈", "JavaScript Trail", "12 TINY MOVIES", "Follow Pip through JavaScript one animated idea at a time. +20 XP per lesson.", (state.jsLessons || []).length + " of " + AI.lessonCount() + " watched") +
+        moduleCard("visuals", "🦊", "Pip’s Code Explainers", AI.explainerCount() + " ANIMATED CONCEPTS", "See the idea behind each AI Code Check game come alive, step by step.", "Play any of them") : "") + '</div>' +
       '<section class="lab-footer-tip"><span>💡</span><p><b>More topics are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
   }
   function dsaPage() {
@@ -1073,6 +1081,13 @@
     account = null; KEY = BASE_KEY; state = seed(); view = "home"; current = null;
     renderAuth("login", "You’ve been signed out on every device.");
   }
+  /* Shared by the AI Code Check module: adds XP to the player (and optionally a skill) and announces level-ups. */
+  function addXp(n, skill) {
+    var before = playerLevel().n;
+    state.xp += n; if (skill && state.skills[skill] !== undefined) state.skills[skill] += n;
+    save();
+    if (playerLevel().n > before) say("You reached Player Level " + playerLevel().n + " — " + playerLevel().name);
+  }
   function reset() {
     settingsConfirm = null; closeAccountModal();
     state = freshAccount(account ? account.name : "Learner"); save(); go("home"); say("Fresh start! Your progress has been reset.");
@@ -1194,6 +1209,7 @@
     if (e.target.id === "profile-form") { e.preventDefault(); submitProfile(e.target); }
   });
   applySettings(getSettings());
+  if (AI) AI.attach({ root: root, state: function() { return state; }, view: function() { return view; }, esc: esc, say: say, save: save, beep: beep, go: go, redraw: draw, trackTabs: trackTabs, addXp: addXp });
   syncThemeUi();
   initAccount();
   window.XPeditionGo = go;

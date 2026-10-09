@@ -1,0 +1,111 @@
+/* Merge Defender: wave HUD, briefing, results, and game-feel effects (flash, shake, XP pop). Loaded after polish.css. */
+.defender-hero { display: flex; align-items: center; gap: 16px; margin: 0 0 18px; padding: 18px 20px; border-radius: 22px; background: linear-gradient(135deg, #5946cf, #8a6cf0); color: #fff; box-shadow: 0 10px 28px rgba(89, 70, 207, .28); }
+.defender-hero > span { font-size: 44px; line-height: 1; }
+.defender-hero > div { flex: 1; min-width: 0; }
+.defender-hero strong { font: 700 22px Fredoka, sans-serif; }
+.defender-hero p { margin: 4px 0 0; font-size: 14px; line-height: 1.45; color: rgba(255, 255, 255, .92); }
+.defender-hero .primary-button { flex: none; background: #fff; color: #5946cf; box-shadow: none; }
+.wave-launch { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; padding: 12px 14px; border-radius: 16px; background: var(--purple-pale, #efedff); color: var(--ink, #20343c); }
+.wave-launch strong { display: block; font: 700 15px Fredoka, sans-serif; }
+.wave-launch span { font-size: 13px; color: var(--muted, #77858a); }
+.wave-hud { margin: 0 0 14px; padding: 14px 16px; border-radius: 20px; background: var(--white, #fff); border: 1px solid var(--line, #e8e9e3); box-shadow: 0 6px 18px rgba(32, 52, 60, .08); color: var(--ink, #20343c); }
+.wave-title span { display: block; font: 800 12px Nunito, sans-serif; letter-spacing: 1.1px; color: var(--purple-dark, #5946cf); }
+.wave-title strong { display: block; margin-top: 2px; font: 700 18px Fredoka, sans-serif; }
+.wave-meter { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.wave-label { flex: none; font: 700 12px Nunito, sans-serif; color: var(--muted, #77858a); }
+.wave-bar { flex: 1; height: 14px; border-radius: 99px; background: var(--canvas, #f3f3ee); overflow: hidden; }
+.wave-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #35b884, #6fd6a5); transition: width .5s ease, background .3s; }
+.wave-bar i.danger { background: linear-gradient(90deg, #e5484d, #f47b67); animation: wave-throb 1s ease-in-out infinite; }
+.wave-hearts { flex: none; letter-spacing: 2px; }
+.wave-heart.off { opacity: .6; }
+.wave-steps { display: flex; gap: 6px; margin-top: 10px; }
+.wave-steps i { flex: 1; height: 8px; border-radius: 99px; background: var(--line, #e8e9e3); }
+.wave-steps i.ok { background: #35b884; }
+.wave-steps i.bad { background: #e5484d; }
+.wave-steps i.now { background: var(--purple, #705ce8); animation: wave-throb 1.2s ease-in-out infinite; }
+.wave-left { margin: 8px 0 0; font: 700 13px Nunito, sans-serif; color: var(--muted, #77858a); }
+.wave-brief { max-width: 640px; margin: 0 auto; padding: 28px 26px; border-radius: 26px; text-align: center; background: var(--white, #fff); border: 1px solid var(--line, #e8e9e3); box-shadow: 0 14px 36px rgba(32, 52, 60, .1); color: var(--ink, #20343c); }
+.wave-brief h1 { margin: 6px 0 10px; font: 700 28px Fredoka, sans-serif; }
+.wave-brief p { margin: 0 auto 14px; max-width: 520px; font-size: 15px; line-height: 1.55; }
+.wave-brief .result-actions { justify-content: center; }
+.wave-rules { display: flex; justify-content: center; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
+.wave-rules div { min-width: 110px; padding: 10px 14px; border-radius: 16px; background: var(--purple-pale, #efedff); }
+.wave-rules b { display: block; font: 700 20px Fredoka, sans-serif; color: var(--purple-dark, #5946cf); }
+.wave-rules small { font: 700 12px Nunito, sans-serif; color: var(--muted, #77858a); }
+.wave-fine { font-size: 13px !important; color: var(--muted, #77858a); }
+.wave-big { display: block; font-size: 64px; line-height: 1; animation: wave-pop .5s ease; }
+.wave-down { border-color: #f1b3b6; }
+.wave-down h1 { color: #c93a40; }
+.wave-stars { display: flex; justify-content: center; gap: 8px; margin: 8px 0 14px; }
+.wave-star { font-size: 56px; line-height: 1; animation: wave-pop .5s ease both; }
+.wave-star.on { color: #f5b82e; text-shadow: 0 4px 14px rgba(245, 184, 46, .5); }
+.wave-star.off { color: var(--line, #d8d9d2); }
+.wave-verdict { display: flex; align-items: center; gap: 12px; margin: 14px 0; padding: 12px 14px; border-radius: 16px; text-align: left; font-size: 14px; }
+.wave-verdict > span { font-size: 28px; }
+.wave-verdict.blocked { background: #dff5ea; color: #1f6a4a; }
+.wave-verdict.breach { background: #fde4e4; color: #a62a30; }
+.fx-flash { position: fixed; inset: 0; z-index: 90; pointer-events: none; animation: fx-flash .6s ease-out forwards; }
+.fx-flash.good { background: radial-gradient(circle, rgba(53, 184, 132, .0) 40%, rgba(53, 184, 132, .35)); }
+.fx-flash.bad { background: radial-gradient(circle, rgba(229, 72, 77, .0) 40%, rgba(229, 72, 77, .38)); }
+.fx-xp { position: fixed; left: 50%; top: 38%; z-index: 91; pointer-events: none; padding: 8px 18px; border-radius: 99px; background: #5946cf; color: #fff; font: 700 28px Fredoka, sans-serif; box-shadow: 0 8px 24px rgba(89, 70, 207, .45); animation: fx-xp 1.2s ease-out forwards; }
+.fx-shake { animation: fx-shake .5s ease; }
+.fx-pulse { animation: fx-pulse .45s ease; }
+@keyframes fx-flash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fx-xp { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -70px) scale(1); } }
+@keyframes fx-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+@keyframes fx-pulse { 0% { transform: scale(1); } 40% { transform: scale(1.012); } 100% { transform: scale(1); } }
+@keyframes wave-pop { 0% { transform: scale(.3); opacity: 0; } 70% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes wave-throb { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+html.reduce-motion .fx-flash, html.reduce-motion .wave-star, html.reduce-motion .wave-big, html.reduce-motion .wave-bar i, html.reduce-motion .wave-steps i { animation: none !important; }
+html.reduce-motion .fx-flash { opacity: .5; }
+@media (prefers-reduced-motion: reduce) { .fx-shake, .fx-pulse, .wave-star, .wave-big, .wave-bar i, .wave-steps i { animation: none !important; } }
+@media (max-width: 640px) {
+  .defender-hero { flex-direction: column; align-items: flex-start; }
+  .wave-meter { flex-wrap: wrap; }
+  .wave-brief { padding: 22px 16px; }
+}
+/* Adaptive difficulty (question pools) */
+.wave-diff { display: inline-block; margin-top: 4px; font: 800 12px Nunito, sans-serif; font-style: normal; letter-spacing: 1px; color: var(--purple-dark, #5946cf); }
+.wave-adapt { margin: 12px 0 0; padding: 10px 14px; border-radius: 14px; font: 700 14px Nunito, sans-serif; }
+.wave-adapt.up { background: #fff1d6; color: #8a5a00; }
+.wave-adapt.down { background: var(--purple-pale, #efedff); color: var(--purple-dark, #5946cf); }
+.scope-pick { display: flex; flex-direction: column; gap: 8px; }
+.scope-pick .spec-verdicts { display: flex; gap: 8px; }
+/* Merge Defender card on Home */
+.defender-home { display: flex; align-items: center; gap: 18px; margin: 0 0 18px; padding: 22px 24px; border-radius: 24px; background: linear-gradient(135deg, #4a39b8, #7c5cf0 60%, #9b7bff); color: #fff; box-shadow: 0 14px 34px rgba(74, 57, 184, .3); }
+.defender-home-main { flex: 1; min-width: 0; }
+.defender-home .dev-eyebrow { color: rgba(255, 255, 255, .85); }
+.defender-home h2 { margin: 4px 0 6px; font: 700 26px Fredoka, sans-serif; color: #fff; }
+.defender-home p { margin: 0 0 12px; font-size: 15px; color: rgba(255, 255, 255, .92); }
+.defender-home .primary-button { background: #fff; color: #4a39b8; box-shadow: none; }
+.defender-home .secondary-button { background: rgba(255, 255, 255, .14); color: #fff; border-color: rgba(255, 255, 255, .4); }
+.home-waves { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.home-wave { padding: 6px 12px; border-radius: 12px; background: rgba(255, 255, 255, .14); }
+.home-wave small { display: block; font: 700 11px Nunito, sans-serif; letter-spacing: .6px; color: rgba(255, 255, 255, .8); }
+.home-wave b { color: #ffd257; letter-spacing: 2px; }
+.home-wave.locked { opacity: .65; }
+.defender-home-art { position: relative; flex: none; font-size: 72px; line-height: 1; }
+.defender-home-art span { position: absolute; right: -14px; bottom: -6px; font-size: 40px; }
+/* Bug Radar */
+.radar-time { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.radar-time .wave-bar i { background: linear-gradient(90deg, #705ce8, #9b7bff); transition: width .25s linear; }
+.radar-time b { min-width: 34px; font: 700 15px Fredoka, sans-serif; color: var(--purple-dark, #5946cf); }
+.radar-compare { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px 0; }
+.radar-compare > div:not(.radar-arrow) { min-width: 120px; padding: 12px 16px; border-radius: 16px; background: var(--canvas, #f3f3ee); text-align: center; }
+.radar-compare .now { background: #dff5ea; }
+.radar-compare span { display: block; font: 800 11px Nunito, sans-serif; letter-spacing: 1px; color: var(--muted, #77858a); }
+.radar-compare strong { display: block; font: 700 30px Fredoka, sans-serif; color: var(--ink, #20343c); }
+.radar-compare .now strong { color: #1f6a4a; }
+.radar-compare small { font-size: 13px; color: var(--muted, #77858a); }
+.radar-arrow { font-size: 26px; color: var(--purple, #705ce8); }
+.radar-note { margin: 8px 0 12px; font-size: 14px; line-height: 1.5; color: var(--ink, #20343c); }
+.radar-bars { display: flex; align-items: flex-end; gap: 8px; height: 90px; margin: 10px 0 14px; padding: 8px 10px 0; border-radius: 14px; background: var(--canvas, #f3f3ee); }
+.radar-bar { flex: 1; max-width: 42px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; }
+.radar-bar i { display: block; width: 100%; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #9b7bff, #705ce8); }
+.radar-bar small { font: 700 11px Nunito, sans-serif; color: var(--muted, #77858a); }
+.radar-panel { margin: 0 0 18px; }
+@media (max-width: 640px) {
+  .defender-home { flex-direction: column; align-items: flex-start; padding: 18px; }
+  .defender-home-art { display: none; }
+  .radar-compare > div:not(.radar-arrow) { min-width: 0; flex: 1; }
+}
