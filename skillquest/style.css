@@ -1,6 +1,6 @@
 :root {
   --ink: #20343c;
-  --muted: #77858a;
+  --muted: #5d6b70;
   --line: #e8e9e3;
   --paper: #fbfbf8;
   --canvas: #f3f3ee;
@@ -440,7 +440,7 @@ body { background: radial-gradient(circle at 90% 3%, #eee8ff 0, transparent 25re
 .dev-pick-card strong { font: 800 10px Fredoka, sans-serif; }
 .dev-pick-card small { color: #8a8095; font-size: 9px; line-height: 1.5; }
 .pick-check { position: absolute; left: 11px; top: 11px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 6px; color: #7451c3; background: #eee8fb; font-size: 11px; font-weight: 800; }
-.ticket-card { margin: 8px 0 15px; border: 1px solid #eee0aa; border-left: 4px solid #efbd52; border-radius: 13px; padding: 12px 14px; background: #fffae9; }
+.ticket-card { margin: 8px 0 15px; border: 1px solid #efbd52; border-radius: 13px; padding: 12px 14px; background: #fffae9; }
 .ticket-card > span { display: block; color: #a27b29; font-size: 8px; font-weight: 900; letter-spacing: 1px; }
 .ticket-card strong { display: block; margin: 5px 0; font: 800 12px Fredoka, sans-serif; }
 .ticket-card p { margin: 5px 0 0; color: #665d48; font-size: 10px; line-height: 1.6; }
@@ -501,7 +501,7 @@ body { background: radial-gradient(circle at 90% 3%, #eee8ff 0, transparent 25re
 .score-donut strong { font: 900 17px Fredoka, sans-serif; }
 .score-donut small { font-size: 6px; font-weight: 900; letter-spacing: .7px; }
 .dev-result > p { margin: 13px 0; color: #5e536d; font-size: 10px; line-height: 1.65; }
-.concept-card { display: grid; gap: 5px; border-left: 3px solid #8e72d7; border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,.8); }
+.concept-card { display: grid; gap: 5px; border: 1px solid #d9cdf3; border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,.8); }
 .concept-card span { color: #8d7ca5; font-size: 7px; font-weight: 900; letter-spacing: 1px; }
 .concept-card strong { color: #564a68; font-size: 9px; line-height: 1.5; }
 .combo-pop { margin-top: 9px; color: #b05b36; font-size: 10px; font-weight: 900; animation: foxBounce .6s ease-out; }

@@ -72,3 +72,35 @@ test("reference solutions pass the JavaScript challenge tests", () => {
     assert.ok(c.tests.some(t => JSON.stringify(starter(...t.args)) !== JSON.stringify(t.expected)), "starter should fail " + c.id);
   }
 });
+
+test("knowledge reels are well formed", () => {
+  assert.ok(content.reels.length >= 6);
+  const ids = content.reels.map(r => r.id);
+  assert.strictEqual(new Set(ids).size, ids.length);
+  for (const r of content.reels) {
+    assert.ok(r.title && r.tag && r.icon && r.hook && r.lesson && r.question, r.id);
+    assert.ok(r.options.length >= 2 && Number.isInteger(r.answer) && r.answer >= 0 && r.answer < r.options.length, r.id);
+  }
+});
+
+test("reel answers that can be run in Node match the listed option", () => {
+  const byId = Object.fromEntries(content.reels.map(r => [r.id, r]));
+  assert.strictEqual(byId.sort.options[byId.sort.answer], "[100, 25, 3]");
+  assert.deepStrictEqual([100, 25, 3].sort(), [100, 25, 3]);
+  const items = [5, 6, 7], seen = [];
+  for (let i = 0; i <= items.length; i++) seen.push(items[i]);
+  assert.strictEqual(seen[seen.length - 1], undefined);
+  assert.strictEqual(byId.offbyone.options[byId.offbyone.answer], "undefined");
+  assert.strictEqual(byId.trace.options[byId.trace.answer], String([{ price: 2, qty: 3 }, { price: 4, qty: 1 }].reduce((s, x) => s + x.price * x.qty, 0)));
+});
+
+test("the workplace story has scored options and feedback for every scene", () => {
+  const story = content.story;
+  assert.ok(story.id && story.title && story.scenes.length >= 3);
+  for (const s of story.scenes) {
+    assert.ok(s.speaker && s.text);
+    assert.strictEqual(s.points.length, s.options.length);
+    assert.strictEqual(s.feedback.length, s.options.length);
+    assert.ok(s.points.every(p => p >= 0 && p <= 2) && s.points.includes(2));
+  }
+});

@@ -34,14 +34,14 @@
 
 .bsr-controls { width: 100%; max-width: 720px; margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .bsr-row-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
-.bsr-label { font-size: 12px; font-weight: 800; color: var(--muted, #77858a); }
+.bsr-label { font-size: 12px; font-weight: 800; color: var(--muted, #5d6b70); }
 .bsr-input, .bsr-select { padding: 9px 12px; border: 1px solid #e6e8e2; border-radius: 12px; background: #fff; color: var(--ink, #20343c); font: 700 12.5px Nunito, system-ui, sans-serif; }
 .bsr-input { width: 84px; }
 .bsr-input[aria-invalid="true"] { border-color: #d6453d; }
 .bsr-input:focus-visible, .bsr-select:focus-visible { outline: 3px solid #a79aff; outline-offset: 2px; }
 .bsr-play { min-width: 96px; justify-content: center; }
 .bsr-error { min-height: 16px; margin: 0; color: #b3261e; font-size: 12px; font-weight: 700; text-align: center; }
-.bsr-hint { margin: 0; color: var(--muted, #77858a); font-size: 11px; text-align: center; }
+.bsr-hint { margin: 0; color: var(--muted, #5d6b70); font-size: 12px; text-align: center; }
 .bsr-reward { display: none; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--mint, #d8f1e6); color: var(--mint-ink, #28694f); font-size: 12px; font-weight: 700; text-align: center; }
 .bsr-reward.bsr-reward-on { display: block; }
 @media (max-width: 620px) { .bsr-cell { width: 30px; } .bsr-box { height: 32px; line-height: 32px; font-size: 12px; } .bsr-card { padding: 16px 10px; } }

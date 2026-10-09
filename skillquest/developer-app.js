@@ -15,17 +15,8 @@
     LESSONS[l.id] = { title: l.title, kind: "nodes", intro: l.intro, code: l.code, steps: l.steps, key: l.steps[l.steps.length - 1].takeaway };
   }); SCEN.forEach(function(x) { SCEN_BY_ID[x.id] = x; }); CHAL.forEach(function(x) { CHAL_BY_ID[x.id] = x; });
   var timer = null, session = fresh(), reelIndex = 0, reelRevealed = false, reelAnswer = null, reelFeedback = "";
-  var REELS = [
-    { id: "trace", title: "Trace before you trust", tag: "CODE READING", icon: "🔎", hook: "AI says this returns 12. Can you spot the tiny twist?", lesson: "Follow the values line by line. Here, the loop adds each price multiplied by its quantity. A test can pass while your mental model is still off.", question: "For items [{price: 2, qty: 3}, {price: 4, qty: 1}], what is the total?", options: ["9", "10", "14"], answer: 1 },
-    { id: "spec", title: "The ticket is the map", tag: "SPEC CHECK", icon: "🧾", hook: "The demo passed. The ticket still says one coupon per customer.", lesson: "Turn each sentence in a ticket into a check. Then point to the code or test that proves it. If you cannot point to evidence, mark it unknown instead of assuming.", question: "Which review comment is most useful?", options: ["Looks good to me!", "Where do we reject a second use by the same customer?", "The code could be cleaner."], answer: 1 },
-    { id: "scope", title: "Keep the change on a leash", tag: "SCOPE CONTROL", icon: "🪁", hook: "A coupon fix also renames six helpers and changes the checkout colors.", lesson: "Extra changes make reviews harder and can hide bugs. Ask for the ticket-sized fix first. Follow-up ideas can become separate work with their own acceptance checks.", question: "What should you do with unrelated refactors?", options: ["Approve everything because tests are green.", "Ask to split them into a separate change.", "Delete the whole branch."], answer: 1 }
-  ];
-  var SIM_STEPS = [
-    { speaker: "Maya · Manager", text: "Two of your tasks are both marked urgent, and you can only finish one by Friday. What do you do?", options: ["Tell Maya both are at risk and ask which one matters most.", "Quietly work late and hope you finish both.", "Pick one yourself and don’t mention the other."], points: [2, 0, 1], feedback: ["Great call. You made the trade-off visible and let the priority owner decide.", "Hoping to do everything leads to burnout and surprises.", "Choosing alone can miss what matters most to others. Tell people about the trade-off."] },
-    { speaker: "Leo · Teammate", text: "In the meeting, Leo presents your idea as his own. Afterwards he looks a bit awkward. How do you respond?", options: ["Talk to Leo privately: “I noticed the idea was mine. Can we credit it properly next time?”", "Say nothing and stay annoyed.", "Correct him loudly in front of the team."], points: [2, 0, 1], feedback: ["Nice. You were direct, kind, and focused on the next step.", "Silent resentment tends to grow and hurts the working relationship.", "Being direct is good, but a public correction can make people defensive. Try it privately first."] },
-    { speaker: "Pip 🦊 · Client call", text: "A client is upset about a missed deadline and starts raising their voice. What happens first?", options: ["Stay calm, acknowledge their frustration, and say what you’ll do next.", "Explain all the reasons it wasn’t your fault.", "End the call until they calm down."], points: [2, 1, 0], feedback: ["Yes. Acknowledging feelings first lowers the temperature, and a clear next step rebuilds trust.", "Explanations can sound like excuses before the person feels heard.", "Ending the call can make a bad moment worse. Stay steady and keep it constructive."] }
-  ];
-  function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) }, binary: { done: !!(x && x.binary && x.binary.done) } }; }
+  var REELS = D.reels, SIM_STEPS = D.story.scenes;
+  function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) }, binary: { done: !!(x && x.binary && x.binary.done) }, reverse: { done: !!(x && x.reverse && x.reverse.done) } }; }
   var AVATAR_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
   function fresh() { return { choice: null, lines: [], order: [], pairs: {}, pending: null, fill: [], code: "", busy: false, stage: "play", lv: 0, seen: [0], ls: 0, result: null }; }
   function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
@@ -146,6 +137,7 @@
     stopLessonPlay(); closeAccountModal();
     if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (window.XPBinarySearch) window.XPBinarySearch.unmount();
+    if (window.XPReverseString) window.XPReverseString.unmount();
     document.body.classList.add("auth-locked");
     var shell = document.querySelector(".app-shell"), gate = document.getElementById("auth-root");
     if (shell) shell.hidden = true;
@@ -381,14 +373,16 @@
     else if (view === "dsa") { label.textContent = "Play Lab · DSA"; dsaPage(); }
     else if (view === "sort") { label.textContent = "Play Lab · DSA · Bubble Sort"; sortPage(); }
     else if (view === "search") { label.textContent = "Play Lab · DSA · Binary Search"; searchPage(); }
+    else if (view === "reverse") { label.textContent = "Play Lab · DSA · Reverse String"; reversePage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || TRAIL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search"].indexOf(view) >= 0)); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "minigames" && MINI_GAME_VIEWS.indexOf(view) >= 0) || (b.dataset.nav === "lab" && ["reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search", "reverse"].indexOf(view) >= 0)); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
     if (view === "search") mountSearchLab(); else if (window.XPBinarySearch) window.XPBinarySearch.unmount();
+    if (view === "reverse") mountReverseLab(); else if (window.XPReverseString) window.XPReverseString.unmount();
     if (MINI_GAME_VIEWS.indexOf(view) < 0) { unmountMiniGames(); root.removeAttribute("data-mini"); }
     syncAccountUi(); syncDailyTaskbar();
   }
@@ -586,7 +580,8 @@
   }
   var ALGOS = [
     { view: "sort", icon: "🫧", title: "Bubble Sort", tag: "SORTING · O(n²)", desc: "Watch neighbours compare and swap while the real code lights up beside them.", done: function() { return state.sortLab.bubble.done; } },
-    { view: "search", icon: "🔎", title: "Binary Search", tag: "SEARCHING · O(log n)", desc: "Halve a sorted list again and again until the target is found, one step at a time.", done: function() { return state.sortLab.binary.done; } }
+    { view: "search", icon: "🔎", title: "Binary Search", tag: "SEARCHING · O(log n)", desc: "Halve a sorted list again and again until the target is found, one step at a time.", done: function() { return state.sortLab.binary.done; } },
+    { view: "reverse", icon: "🔁", title: "Reverse a String", tag: "TWO POINTERS · O(n)", desc: "Two pointers swap characters from both ends until they meet, with the code lit up beside them.", done: function() { return state.sortLab.reverse.done; } }
   ];
   function algosDone() { return ALGOS.filter(function(a) { return a.done(); }).length; }
   function animatedPage() {
@@ -611,6 +606,20 @@
     state.sortLab.binary.done = true; state.xp += 40; save();
     say("Binary Search complete! +40 XP");
     return { message: "🎉 " + (result.found ? "Found it" : "Ruled it out") + " in " + result.steps + " step" + (result.steps === 1 ? "" : "s") + ". +40 XP and the Search Savant badge!" };
+  }
+  function reversePage() {
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Reverse a String 🔁</h1><p>Type any text, then step forwards or backwards. Reach the end once to earn XP and the Pointer Pro badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="reverse-string-host"></div>';
+  }
+  function mountReverseLab() {
+    var host = document.getElementById("reverse-string-host");
+    if (!host || !window.XPReverseString) { if (host) host.textContent = "The visualizer could not load. Refresh the page to try again."; return; }
+    window.XPReverseString.mount(host, { alreadyDone: state.sortLab.reverse.done, onComplete: completeReverseString });
+  }
+  function completeReverseString(result) {
+    if (state.sortLab.reverse.done) return { message: "✓ Pointer Pro badge earned — replay any time for practice." };
+    state.sortLab.reverse.done = true; state.xp += 40; save();
+    say("Reverse a String complete! +40 XP");
+    return { message: "🎉 You reversed " + result.length + " character" + (result.length === 1 ? "" : "s") + " in " + result.steps + " steps. +40 XP and the Pointer Pro badge!" };
   }
   function sortPage() {
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">PLAY LAB · DSA · +40 XP</span><h1>Bubble Sort 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="bubble-sort-host"></div>';
@@ -637,8 +646,8 @@
     var r = REELS[reelIndex], completed = has(state.reels, r.id), answered = reelAnswer !== null;
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">QUICK LEARN · ' + (reelIndex + 1) + ' OF ' + REELS.length + '</span><h1>Knowledge Reels 📼</h1><p>Flip a card, catch one idea, and bank a little XP.</p></div><button class="dev-link" data-nav="lab">← Play Lab</button></section>' +
       '<div class="reel-wrap"><div class="reel-progress">' + REELS.map(function(x, i) { return '<button class="reel-dot ' + (i === reelIndex ? 'active' : '') + ' ' + (has(state.reels, x.id) ? 'done' : '') + '" data-action="reel-goto" data-index="' + i + '" aria-label="Reel ' + (i + 1) + '"></button>'; }).join('') + '</div>' +
-      '<button class="reel-card ' + (reelRevealed ? 'flipped' : '') + '" data-action="reel-flip"><span class="reel-card-tag">' + r.tag + '</span><span class="reel-card-icon">' + r.icon + '</span><strong>' + (reelRevealed ? r.title : r.hook) + '</strong><small>' + (reelRevealed ? 'TAP TO FLIP BACK' : 'TAP TO REVEAL THE 20-SECOND TIP') + '</small></button>' +
-      (reelRevealed ? '<section class="reel-lesson"><span>💡 PIP’S POCKET TIP</span><p>' + r.lesson + '</p><h3>' + r.question + '</h3><div class="reel-answer-list">' + r.options.map(function(x, i) { return '<button class="reel-answer ' + (reelAnswer === i ? 'picked' : '') + '" data-reel-answer="' + i + '">' + x + '</button>'; }).join('') + '</div>' + (reelFeedback ? '<p class="reel-feedback ' + (completed ? 'correct' : '') + '">' + reelFeedback + '</p>' : '') + '<button class="primary-button" data-action="reel-check"' + (!answered || completed ? ' disabled' : '') + '>' + (completed ? 'Reel collected ✓' : 'Check it · +35 XP') + '</button></section>' : '<p class="reel-swipe-hint">Tiny lesson. No long scroll. Pinky promise. 🤙</p>') +
+      '<button class="reel-card ' + (reelRevealed ? 'flipped' : '') + '" data-action="reel-flip"><span class="reel-card-tag">' + esc(r.tag) + '</span><span class="reel-card-icon">' + esc(r.icon) + '</span><strong>' + esc(reelRevealed ? r.title : r.hook) + '</strong><small>' + (reelRevealed ? 'TAP TO FLIP BACK' : 'TAP TO REVEAL THE 20-SECOND TIP') + '</small></button>' +
+      (reelRevealed ? '<section class="reel-lesson"><span>💡 PIP’S POCKET TIP</span><p>' + esc(r.lesson) + '</p><h3>' + esc(r.question) + '</h3><div class="reel-answer-list">' + r.options.map(function(x, i) { return '<button class="reel-answer ' + (reelAnswer === i ? 'picked' : '') + '" data-reel-answer="' + i + '">' + esc(x) + '</button>'; }).join('') + '</div>' + (reelFeedback ? '<p class="reel-feedback ' + (completed ? 'correct' : '') + '">' + esc(reelFeedback) + '</p>' : '') + '<button class="primary-button" data-action="reel-check"' + (!answered || completed ? ' disabled' : '') + '>' + (completed ? 'Reel collected ✓' : 'Check it · +35 XP') + '</button></section>' : '<p class="reel-swipe-hint">Tiny lesson. No long scroll. Pinky promise. 🤙</p>') +
       '<div class="reel-nav"><button class="secondary-button" data-action="reel-prev">← Previous</button><span>' + state.reels.length + ' / ' + REELS.length + ' collected</span><button class="secondary-button" data-action="reel-next">Next →</button></div></div>';
   }
   function simulatorPage() {
@@ -651,7 +660,7 @@
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">WORKPLACE SIMULATOR · SCENE ' + (i + 1) + ' OF ' + SIM_STEPS.length + '</span><h1>Choose Your Move 🎭</h1><p>Your choices change the debrief. There’s no timer and no real-world risk.</p></div><button class="dev-link" data-nav="map">← Game map</button></section>' +
       '<div class="sim-scene-track">' + SIM_STEPS.map(function(_, j) { return '<span class="' + (j < i ? 'complete' : (j === i ? 'active' : '')) + '"></span>'; }).join('') + '</div>' +
       (s.last ? '<div class="sim-last-feedback">💬 ' + esc(s.last) + '</div>' : '') +
-      '<section class="sim-scene"><div class="sim-scene-person">' + (i === 0 ? '🧑‍💻' : (i === 1 ? '🧑‍🤝‍🧑' : '🦊')) + '</div><span class="dev-eyebrow">' + step.speaker + '</span><h2>' + step.text + '</h2><div class="sim-options">' + step.options.map(function(x, j) { return '<button class="sim-option" data-sim-choice="' + j + '"><span>' + String.fromCharCode(65 + j) + '</span>' + x + '<b>→</b></button>'; }).join('') + '</div><small class="sim-score-hint">Current team points: ' + s.score + ' · pick what you’d really do.</small></section>';
+      '<section class="sim-scene"><div class="sim-scene-person">' + (i === 0 ? '🧑‍💻' : (i === 1 ? '🧑‍🤝‍🧑' : '🦊')) + '</div><span class="dev-eyebrow">' + esc(step.speaker) + '</span><h2>' + esc(step.text) + '</h2><div class="sim-options">' + step.options.map(function(x, j) { return '<button class="sim-option" data-sim-choice="' + j + '"><span>' + String.fromCharCode(65 + j) + '</span>' + esc(x) + '<b>→</b></button>'; }).join('') + '</div><small class="sim-score-hint">Current team points: ' + s.score + ' · pick what you’d really do.</small></section>';
   }
   function achievementList() {
     var anySkill = SKILLS.some(function(k) { return levelInfo(state.skills[k.id], SKILL_AT).n >= 2; });
@@ -669,10 +678,11 @@
       { icon: "🌈", title: "Well-Rounded", desc: "Earn XP in all six soft skills.", unlocked: SKILLS.every(function(k) { return state.skills[k.id] > 0; }) },
       { icon: "🌱", title: "Rising Skill", desc: "Reach Level 2 in any skill.", unlocked: anySkill },
       { icon: "🎁", title: "Daily Dynamo", desc: "Claim today’s daily quest reward.", unlocked: state.daily.claimed },
-      { icon: "📼", title: "Pocket Professor", desc: "Collect all three Knowledge Reels.", unlocked: state.reels.length >= REELS.length },
+      { icon: "📼", title: "Pocket Professor", desc: "Collect all " + REELS.length + " Knowledge Reels.", unlocked: state.reels.length >= REELS.length },
       { icon: "🎭", title: "Calm in the Chaos", desc: "Finish the workplace simulator.", unlocked: state.simulator.done },
       { icon: "🔎", title: "Search Savant", desc: "Finish a Binary Search lab.", unlocked: state.sortLab.binary.done },
-      { icon: "🫧", title: "Sort Sprinter", desc: "Watch the whole Bubble Sort lab.", unlocked: state.sortLab.bubble.done }
+      { icon: "🫧", title: "Sort Sprinter", desc: "Watch the whole Bubble Sort lab.", unlocked: state.sortLab.bubble.done },
+      { icon: "🔁", title: "Pointer Pro", desc: "Finish the Reverse a String lab.", unlocked: state.sortLab.reverse.done }
     ];
   }
   function achievementsPage() {
