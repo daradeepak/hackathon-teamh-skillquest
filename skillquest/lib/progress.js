@@ -56,7 +56,7 @@ function sanitizeProgress(input) {
   const sim = p.simulator && typeof p.simulator === "object" ? p.simulator : {};
   return {
     name: String(p.name || "").slice(0, 40), xp: clampInt(p.xp, MAX_XP), sound: !!p.sound, skills, scenarios, tech, lessons, aicheck, jsLessons,
-    sortLab: { bubble: lab(p.sortLab && p.sortLab.bubble), binary: lab(p.sortLab && p.sortLab.binary) },
+    sortLab: { bubble: lab(p.sortLab && p.sortLab.bubble), binary: lab(p.sortLab && p.sortLab.binary), reverse: lab(p.sortLab && p.sortLab.reverse) },
     daily: { date: String((p.daily && p.daily.date) || "").slice(0, 10), actions: strings(p.daily && p.daily.actions), claimed: !!(p.daily && p.daily.claimed) },
     reels: strings(p.reels),
     simulator: {
