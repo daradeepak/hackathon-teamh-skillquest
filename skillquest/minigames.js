@@ -183,7 +183,7 @@
   }
 
   function escHtml(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   var MEMORY_LEVELS = {
@@ -381,7 +381,7 @@
 
     function render() {
       listEl.innerHTML = order.map(function(cmd, i) {
-        return '<li><button type="button" class="mg-gitline-chip' + (selected === i ? " is-pick" : "") + '" data-i="' + i + '"><span class="mg-gitline-num">' + (i + 1) + '</span><code>' + cmd + "</code></button></li>";
+        return '<li><button type="button" class="mg-gitline-chip' + (selected === i ? " is-pick" : "") + '" data-i="' + i + '"><span class="mg-gitline-num">' + (i + 1) + '</span><code>' + escHtml(cmd) + "</code></button></li>";
       }).join("");
     }
 
@@ -426,7 +426,9 @@
       render();
     }
 
+    var shipPending = false;
     function onShip() {
+      if (shipPending) return;
       if (!isCorrect()) {
         statusEl.className = "mg-status mg-status--bad";
         statusEl.textContent = "Not yet — check the scenario and try again.";
@@ -441,7 +443,8 @@
       statusEl.textContent = "Shipped! +" + roundScore + " this round.";
       swaps = 0;
       swapsEl.textContent = "0";
-      setTimeout(nextRound, 700);
+      shipPending = true;
+      setTimeout(function() { shipPending = false; nextRound(); }, 700);
     }
 
     listEl.addEventListener("click", onListClick);
@@ -516,7 +519,7 @@
       wordsEl.textContent = q.word;
       var optsList = shuffle([q.pick].concat(q.wrong));
       choicesEl.innerHTML = optsList.map(function(label) {
-        return '<button type="button" class="mg-kebab-opt" data-pick="' + label + '"><code>' + label + "</code></button>";
+        return '<button type="button" class="mg-kebab-opt" data-pick="' + escHtml(label) + '"><code>' + escHtml(label) + "</code></button>";
       }).join("");
       statusEl.className = "mg-status";
       statusEl.textContent = "Go!";
