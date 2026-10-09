@@ -64,3 +64,10 @@ html.reduce-motion .fx-flash { opacity: .5; }
   .wave-meter { flex-wrap: wrap; }
   .wave-brief { padding: 22px 16px; }
 }
+/* Adaptive difficulty (question pools) */
+.wave-diff { display: inline-block; margin-top: 4px; font: 800 12px Nunito, sans-serif; font-style: normal; letter-spacing: 1px; color: var(--purple-dark, #5946cf); }
+.wave-adapt { margin: 12px 0 0; padding: 10px 14px; border-radius: 14px; font: 700 14px Nunito, sans-serif; }
+.wave-adapt.up { background: #fff1d6; color: #8a5a00; }
+.wave-adapt.down { background: var(--purple-pale, #efedff); color: var(--purple-dark, #5946cf); }
+.scope-pick { display: flex; flex-direction: column; gap: 8px; }
+.scope-pick .spec-verdicts { display: flex; gap: 8px; }

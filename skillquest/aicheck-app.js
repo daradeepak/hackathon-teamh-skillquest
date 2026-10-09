@@ -7,6 +7,23 @@
   var C = window.XP_AICHECK, G = C.games, LEVELS = C.coreLevels;
   var VISUALS = window.DEVQUEST_VISUALS.items, JS_LESSONS = window.DEVQUEST_JS_LESSONS.lessons, ALL_VISUALS = VISUALS.concat(JS_LESSONS);
   var VIEWS = ["aimap", "aigame", "jstrail", "jscinema", "visuals"], VISUAL_VIEWS = ["aigame", "jscinema", "visuals"];
+  /* Question pools (aicheck-pools.js): each game has several versions with a difficulty from 1 (easy) to 3 (hard). */
+  var POOLS = window.XP_AICHECK_POOLS || { base: {}, variants: {} };
+  var round = null, recent = {};
+  function versions(id) {
+    var b = G[id]; if (!b) return [];
+    return [Object.assign({}, b, { vid: id, difficulty: POOLS.base[id] || 2 })].concat((POOLS.variants[id] || []).map(function(v) { return Object.assign({}, b, v, { id: id }); }));
+  }
+  function pickVersion(id, target, avoid, maxDiff) {
+    var all = versions(id), pool = all.filter(function(v) { return avoid.indexOf(v.vid) < 0 && (!maxDiff || v.difficulty <= maxDiff); });
+    if (!pool.length) pool = all.filter(function(v) { return avoid.indexOf(v.vid) < 0; });
+    if (!pool.length) pool = all;
+    if (target) { var gap = Math.min.apply(null, pool.map(function(v) { return Math.abs(v.difficulty - target); })); pool = pool.filter(function(v) { return Math.abs(v.difficulty - target) === gap; }); }
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function remember(id, vid) { var r = (recent[id] || []).filter(function(x) { return x !== vid; }); r.push(vid); if (r.length > 2) r.shift(); recent[id] = r; }
+  function cur() { return round || G[current]; }
+  function dots(d) { return "●●●".slice(0, d) + "○○○".slice(0, 3 - d); }
   var ctx = null, aiTrack = "core", current = null, hint = false, session = fresh();
   var visualId = VISUALS[0].id, visualStep = 0, visualPlaying = false, visualTimer = null;
 
@@ -59,14 +76,15 @@
     else if (name === "cinema") ctx.go("jscinema");
     else if (name === "visuals") ctx.go("visuals");
   }
-  function openGame(id, inWave) {
+  function openGame(id, opts) {
     if (!G[id]) return;
-    if (!inWave) wave = null;
-    if (!inWave && !canOpen(id)) { ctx.say(isBoss(id) ? "Win 3 games at Okay or better to unlock this boss." : "Beat the earlier boss to open this level."); return; }
+    wave = null; opts = opts || {};
+    if (!canOpen(id)) { ctx.say(isBoss(id) ? "Win 3 games at Okay or better to unlock this boss." : "Beat the earlier boss to open this level."); return; }
     stopVisualPlayback();
     var v = visualForGame(id); if (v) { visualId = v.id; visualStep = 0; }
     current = id; hint = false; session = fresh();
-    if (G[id].kind === "codeFix") session.code = G[id].starterCode;
+    round = pickVersion(id, opts.target, (recent[id] || []).concat(opts.avoid ? [opts.avoid] : []), opts.maxDiff); remember(id, round.vid);
+    if (round.kind === "codeFix") session.code = round.starterCode;
     ctx.go("aigame");
   }
   function redraw() { ctx.redraw(); }
@@ -79,18 +97,23 @@
     { name: "The 2 AM deploy", brief: "BugBot is deploying on its own and nobody is awake. You write the requirements, check security, and own what ships. This is the last line of defence." }
   ];
   function hearts(n) { var h = ""; for (var i = 0; i < 3; i++) h += '<span class="wave-heart ' + (i < n ? "on" : "off") + '" aria-hidden="true">' + (i < n ? "❤️" : "🖤") + '</span>'; return h; }
-  function waveQueue(lv) { var l = LEVELS[lv - 1]; return l.games.concat([l.boss]); }
+  /* 5 pull requests: the level's 3 games in random order, one of them again (as a different version), then the boss. */
+  function waveQueue(lv) {
+    var l = LEVELS[lv - 1], games = l.games.slice().sort(function() { return Math.random() - .5; });
+    return games.concat([games[Math.floor(Math.random() * games.length)], l.boss]);
+  }
   function startWave(lv) {
     if (!levelOpen(lv)) { ctx.say("Clear the earlier wave’s boss first."); return; }
     stopVisualPlayback();
-    wave = { level: lv, queue: waveQueue(lv), idx: 0, lives: 3, scores: [], stage: "brief", streak: 0, chestOpened: false, prize: "", newStars: 0 };
+    wave = { level: lv, queue: waveQueue(lv), idx: 0, lives: 3, scores: [], stage: "brief", streak: 0, chestOpened: false, prize: "", newStars: 0, diff: 1, sinceChange: 0, diffNote: "", used: [] };
     current = wave.queue[0]; hint = false; session = fresh();
     ctx.go("aigame");
   }
   function beginRound() { wave.stage = "play"; playRound(); }
   function playRound() {
     current = wave.queue[wave.idx]; hint = false; session = fresh();
-    if (G[current].kind === "codeFix") session.code = G[current].starterCode;
+    round = pickVersion(current, wave.diff, wave.used); wave.used.push(round.vid);
+    if (round.kind === "codeFix") session.code = round.starterCode;
     var v = visualForGame(current); if (v) { visualId = v.id; visualStep = 0; }
     ctx.go("aigame");
   }
@@ -111,12 +134,14 @@
     redraw(); fx("win");
   }
   function waveBlockedNote(score) {
-    return score >= 60 ? '<div class="wave-verdict blocked"><span>🛡️</span><div><strong>Blocked!</strong> BugBot’s change never reached production.</div></div>'
-      : '<div class="wave-verdict breach"><span>💥</span><div><strong>A bug got into production!</strong> ' + (wave.lives > 0 ? "Production lost a life." : "That was the last life.") + '</div></div>';
+    var more = wave.lives > 0 && wave.idx < wave.queue.length - 1;
+    var adapt = more && wave.diffNote === "up" ? '<div class="wave-adapt up">📈 BugBot is getting sneakier. The next PR is harder.</div>' : (more && wave.diffNote === "down" ? '<div class="wave-adapt down">📉 BugBot sends an easier one next. Take a breath.</div>' : "");
+    return adapt + (score >= 60 ? '<div class="wave-verdict blocked"><span>🛡️</span><div><strong>Blocked!</strong> BugBot’s change never reached production.</div></div>'
+      : '<div class="wave-verdict breach"><span>💥</span><div><strong>A bug got into production!</strong> ' + (wave.lives > 0 ? "Production lost a life." : "That was the last life.") + '</div></div>');
   }
   function waveHud() {
     var total = wave.queue.length, left = total - wave.idx - (session.result ? 1 : 0), pct = Math.max(0, Math.round(wave.lives / 3 * 100));
-    return '<section class="wave-hud" aria-label="Merge Defender status"><div class="wave-title"><span>🛡️ MERGE DEFENDER · WAVE ' + wave.level + '</span><strong>' + (wave.idx >= wave.queue.length - 1 ? "Boss PR: " : "PR " + (wave.idx + 1) + " of " + total + ": ") + esc(G[current].title) + '</strong></div>' +
+    return '<section class="wave-hud" aria-label="Merge Defender status"><div class="wave-title"><span>🛡️ MERGE DEFENDER · WAVE ' + wave.level + '</span><strong>' + (wave.idx >= wave.queue.length - 1 ? "Boss PR: " : "PR " + (wave.idx + 1) + " of " + total + ": ") + esc(cur().title) + '</strong><em class="wave-diff">Difficulty ' + dots(cur().difficulty || 1) + '</em></div>' +
       '<div class="wave-meter"><span class="wave-label">Production health</span><div class="wave-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i class="' + (wave.lives === 1 ? "danger" : "") + '" style="width:' + pct + '%"></i></div><span class="wave-hearts">' + hearts(wave.lives) + '</span></div>' +
       '<div class="wave-steps" aria-hidden="true">' + wave.queue.map(function(id, i) { var sc = wave.scores[i]; return '<i class="' + (sc !== undefined ? (sc >= 60 ? "ok" : "bad") : (i === wave.idx ? "now" : "")) + '"></i>'; }).join("") + '</div>' +
       '<p class="wave-left">' + (left > 0 ? left + " more PR" + (left === 1 ? "" : "s") + " to clear this wave" : "Last PR reviewed") + (wave.streak > 1 ? " · 🔥 " + wave.streak + " blocked in a row" : "") + '</p></section>';
@@ -124,8 +149,8 @@
   function waveBriefing() {
     var story = STORY[wave.level - 1], l = LEVELS[wave.level - 1];
     root().innerHTML = '<div class="dev-game-page ai-scope"><section class="wave-brief"><span class="dev-eyebrow">MISSION BRIEFING · WAVE ' + wave.level + '</span><h1>🛡️ ' + esc(story.name) + '</h1><p>' + esc(story.brief) + '</p>' +
-      '<div class="wave-rules"><div><b>' + wave.queue.length + '</b><small>pull requests</small></div><div><b>3 ❤️</b><small>production lives</small></div><div><b>👑</b><small>boss PR last</small></div></div>' +
-      '<p class="wave-fine">Block a PR with <b>60%+</b>. Miss one and a bug reaches production (−1 life). Lose all three and production goes down, but you can retry instantly with no penalty.</p>' +
+      '<div class="wave-rules"><div><b>' + wave.queue.length + '</b><small>pull requests</small></div><div><b>3 ❤️</b><small>production lives</small></div><div><b>👑</b><small>boss PR last</small></div><div><b>📈</b><small>difficulty adapts</small></div></div>' +
+      '<p class="wave-fine">Block a PR with <b>60%+</b>. Miss one and a bug reaches production (−1 life). Lose all three and production goes down, but you can retry instantly with no penalty. Two blocks in a row make BugBot sneakier; a miss makes the next PR easier.</p>' +
       '<div class="result-actions"><button class="primary-button" data-ai-act="wave-begin">Start Wave ' + wave.level + ' → ' + l.icon + '</button><button class="secondary-button" data-ai-open="map">Not now</button></div></section></div>';
   }
   function waveDown() {
@@ -209,7 +234,7 @@
     return '<div class="dev-code-list">' + lines.map(function(line, i) { var yes = has(selected || [], i); return '<button class="dev-code-line ' + (yes ? "selected" : "") + '" data-ai-line="' + i + '"><span class="line-no">' + (i + 1) + '</span><code>' + esc(line) + '</code><span class="line-mark">' + (yes ? "✦" : "") + '</span></button>'; }).join("") + '</div>';
   }
   function gameScreen() {
-    var g = G[current];
+    var g = cur();
     if (!g) { openView("map"); return; }
     if (wave && wave.stage === "brief") { waveBriefing(); return; }
     if (wave && wave.stage === "down") { waveDown(); return; }
@@ -235,18 +260,18 @@
       var v = session.verdicts[i], e = session.evidence[i], active = session.activeCriterion === i;
       return '<div class="spec-criterion ' + (active ? "active" : "") + '"><div class="spec-criterion-text"><span>' + (i + 1) + '</span><strong>' + esc(r.text) + '</strong></div><div class="spec-verdicts"><button class="' + (v === "met" ? "chosen good" : "") + '" data-ai-verdict="' + i + '" data-ai-value="met">✓ Met</button><button class="' + (v === "missing" ? "chosen bad" : "") + '" data-ai-verdict="' + i + '" data-ai-value="missing">✕ Missing</button></div><button class="evidence-pick ' + (active ? "active" : "") + '" data-ai-evidence="' + i + '">' + (active ? "Now tap a code line ↓" : (typeof e === "number" ? "Evidence: line " + (e + 1) + " · change" : "Pick evidence line")) + '</button></div>';
     }).join("");
-    return '<div class="ticket-card"><span>🎟️ SHOP-214 · ACCEPTANCE CRITERIA</span><strong>Coupon at checkout</strong><p>Apply an active code, allow one use per customer, reject expired coupons, and keep the total at or above ₹0.</p></div><div class="spec-layout"><div class="spec-criteria"><div class="spec-subhead">Does the diff meet it?</div>' + criteria + '</div><div class="spec-diff"><div class="spec-subhead">AI CHANGE · TAP EVIDENCE</div>' + codeLines(g.code, []) + '<label class="scope-flag"><input type="checkbox" data-ai-scope ' + (session.scope ? "checked" : "") + '> <span><b>Flag scope creep</b><small>' + esc(g.scopeCreep) + '</small></span></label></div></div><p class="dev-inline-tip">' + (session.activeCriterion === null ? "Pick a criterion, choose Met or Missing, then choose its evidence line." : "Now tap the code line that best supports this answer.") + '</p>';
+    return '<div class="ticket-card"><span>🎟️ ' + esc(g.ticketId || "SHOP-214") + ' · ACCEPTANCE CRITERIA</span><strong>' + esc(g.ticketTitle || "Coupon at checkout") + '</strong><p>' + esc(g.ticketText || "Apply an active code, allow one use per customer, reject expired coupons, and keep the total at or above ₹0.") + '</p></div><div class="spec-layout"><div class="spec-criteria"><div class="spec-subhead">Does the diff meet it?</div>' + criteria + '</div><div class="spec-diff"><div class="spec-subhead">AI CHANGE · TAP EVIDENCE</div>' + codeLines(g.code, []) + '<div class="scope-flag scope-pick"><span><b>Anything extra in this PR?</b><small>' + esc(g.scopeCreep || g.scopeNote || "") + '</small></span><div class="spec-verdicts"><button class="' + (session.scopeTouched && session.scope ? "chosen bad" : "") + '" data-ai-scopepick="yes">🚩 Scope creep</button><button class="' + (session.scopeTouched && !session.scope ? "chosen good" : "") + '" data-ai-scopepick="no">✓ Belongs here</button></div></div></div></div><p class="dev-inline-tip">' + (session.activeCriterion === null ? "Pick a criterion, choose Met or Missing, then choose its evidence line." : "Now tap the code line that best supports this answer.") + '</p>';
   }
   function prBody(g) {
-    return '<div class="ticket-card"><span>🎟️ TICKET SHOP-214</span><p>' + esc(g.ticket) + '</p></div><div class="devbot-chat"><span class="devbot-face">🤖</span><div><strong>DevBot says:</strong><p>“I added the coupon logic and cleaned up a few things while I was in there. Ready to merge?”</p><small>Scripted demo chat · works offline</small></div></div><div class="pr-issue-list">' +
+    return '<div class="ticket-card"><span>🎟️ TICKET ' + esc(g.ticketId || "SHOP-214") + '</span><p>' + esc(g.ticket) + '</p></div><div class="devbot-chat"><span class="devbot-face">🤖</span><div><strong>DevBot says:</strong><p>“' + esc(g.botSays || "I added the coupon logic and cleaned up a few things while I was in there. Ready to merge?") + '”</p><small>Scripted demo chat · works offline</small></div></div><div class="pr-issue-list">' +
       g.issues.map(function(x, i) { var v = session.reviews[x.id]; return '<div class="pr-issue"><div class="pr-issue-num">0' + (i + 1) + '</div><p>' + esc(x.title) + '</p><button class="' + (v === true ? "picked" : "") + '" data-ai-review="' + esc(x.id) + '" data-ai-flag="true">🚩 Flag it</button><button class="' + (v === false ? "picked" : "") + '" data-ai-review="' + esc(x.id) + '" data-ai-flag="false">✅ Looks good</button></div>'; }).join("") + '</div>';
   }
   function testArgs(t) { return Array.isArray(t.args) ? t.args : [t.total, t.discount]; }
   function codeFixBody(g) {
     var status = "";
     if (session.tests) status = '<div class="worker-test-results ' + (session.tests.all ? "all-pass" : "some-fail") + '"><strong>' + (session.tests.all ? "✅ All tests pass!" : "🧪 " + session.tests.passed + " of " + session.tests.total + " tests pass") + '</strong>' +
-      session.tests.rows.map(function(r, i) { return '<span>' + (r.pass ? "✓" : "✕") + ' Test ' + (i + 1) + ': ' + esc((g.functionName || "applyCoupon") + "(" + r.args.join(", ") + ") → " + String(r.actual)) + (r.pass ? "" : " · expected " + esc(r.expected)) + '</span>'; }).join("") + '</div>';
-    return '<div class="ticket-card"><span>🎟️ TICKET · COUPON-008</span><p>The discount may reduce the order total, but the final total must never be negative.</p></div><label class="code-editor-label" for="ai-fix-editor">YOUR FIX <span>JavaScript · timed Web Worker</span></label><textarea id="ai-fix-editor" class="code-editor" spellcheck="false" autocapitalize="off">' + esc(session.code || g.starterCode) + '</textarea><div class="test-expectations"><strong>Test cases</strong>' + g.tests.map(function(t) { var a = testArgs(t); return '<span>' + esc(a.join(" − ") + " → " + t.expected) + '</span>'; }).join("") + '</div>' + status;
+      session.tests.rows.map(function(r, i) { return '<span>' + (r.pass ? "✓" : "✕") + ' Test ' + (i + 1) + ': ' + esc((g.functionName || "applyCoupon") + "(" + r.args.map(function(x) { return JSON.stringify(x); }).join(", ") + ") → " + JSON.stringify(r.actual)) + (r.pass ? "" : " · expected " + esc(JSON.stringify(r.expected))) + '</span>'; }).join("") + '</div>';
+    return '<div class="ticket-card"><span>🎟️ TICKET · ' + esc(g.ticketId || "COUPON-008") + '</span><p>' + esc(g.ticketText || "The discount may reduce the order total, but the final total must never be negative.") + '</p></div><label class="code-editor-label" for="ai-fix-editor">YOUR FIX <span>JavaScript · timed Web Worker</span></label><textarea id="ai-fix-editor" class="code-editor" spellcheck="false" autocapitalize="off">' + esc(session.code || g.starterCode) + '</textarea><div class="test-expectations"><strong>Test cases</strong>' + g.tests.map(function(t) { var a = testArgs(t); return '<span>' + esc((g.functionName || "applyCoupon") + "(" + a.map(function(x) { return JSON.stringify(x); }).join(", ") + ") → " + JSON.stringify(t.expected)) + '</span>'; }).join("") + '</div>' + status;
   }
   function canSubmit(g) {
     if (g.kind === "choice") return session.choice !== null;
@@ -261,10 +286,10 @@
     var chest = r.chestOpened ? '<div class="chest-opened">🎉 You found <b>' + esc(r.prize) + '</b> and +25 bonus XP!</div>' : (r.chest ? '<button class="mystery-chest" data-ai-act="chest">📦 Open your mystery chest <span>tap for a bonus!</span></button>' : '<div class="chest-opened replay-note">🔁 Replay complete · best score ' + best + '%</div>');
     return '<div class="dev-result ' + (r.score >= 80 ? "great" : (r.score >= 60 ? "okay" : "retry")) + '"><div class="dev-result-top"><span class="result-sticker">' + (r.score >= 80 ? "🎉" : (r.score >= 60 ? "✨" : "🧩")) + '</span><div><span class="dev-eyebrow">' + r.grade + '</span><h2>' + esc(r.headline) + '</h2></div><div class="score-donut"><strong>' + r.score + '</strong><small>POINTS</small></div></div><p>' + esc(r.explanation) + '</p><div class="concept-card"><span>💡 TAKE THIS WITH YOU</span><strong>' + esc(g.concept) + '</strong></div>' +
       (r.combo > 1 ? '<div class="combo-pop">🔥 Combo ×' + r.combo + (r.bonus ? " · +" + r.bonus + " bonus XP" : "") + '</div>' : "") + '<div class="result-xp">' + (r.xp ? "⚡ +" + r.xp + " XP" : "Practice run · no extra XP") + '</div>' + chest +
-      (r.reply ? '<div class="devbot-reply"><span>🤖 DevBot:</span> ' + esc(r.reply) + '</div>' : "") + (wave ? waveBlockedNote(r.score) + '<div class="result-actions"><button class="primary-button" data-ai-act="wave-next">' + (wave.lives <= 0 ? "Production is down →" : (wave.idx >= wave.queue.length - 1 ? "See wave results →" : "Next pull request →")) + '</button></div></div>' : '<div class="result-actions"><button class="primary-button" data-ai-act="continue">Keep going →</button><button class="secondary-button" data-ai-act="replay">Play this one again</button><button class="secondary-button" data-ai-open="' + (g.track === "ai" ? "ai-track" : "map") + '">Back to AI Code Check</button></div></div>');
+      (r.reply ? '<div class="devbot-reply"><span>🤖 DevBot:</span> ' + esc(r.reply) + '</div>' : "") + (wave ? waveBlockedNote(r.score) + '<div class="result-actions"><button class="primary-button" data-ai-act="wave-next">' + (wave.lives <= 0 ? "Production is down →" : (wave.idx >= wave.queue.length - 1 ? "See wave results →" : "Next pull request →")) + '</button></div></div>' : '<div class="result-actions">' + (r.score < 60 && versions(g.id).length > 1 ? '<button class="primary-button" data-ai-act="similar">Try a similar one →</button>' : "") + '<button class="' + (r.score < 60 && versions(g.id).length > 1 ? "secondary-button" : "primary-button") + '" data-ai-act="continue">Keep going →</button><button class="secondary-button" data-ai-act="replay">Play this one again</button><button class="secondary-button" data-ai-open="' + (g.track === "ai" ? "ai-track" : "map") + '">Back to AI Code Check</button></div></div>');
   }
   function submit() {
-    var g = G[current], score = 0, reply = "";
+    var g = cur(), score = 0, reply = "";
     if (!canSubmit(g)) { ctx.say("Finish the little checks first."); return; }
     if (g.kind === "codeFix") { runCode(g); return; }
     if (g.kind === "choice") score = session.choice === g.answer ? 100 : 0;
@@ -307,6 +332,10 @@
     if (wave && wave.queue[wave.idx] === g.id) {
       wave.scores[wave.idx] = score;
       if (score >= 60) wave.streak += 1; else { wave.lives = Math.max(0, wave.lives - 1); wave.streak = 0; }
+      /* adaptive difficulty: 2 blocks in a row → harder; a miss → easier */
+      wave.diffNote = "";
+      if (score >= 60) { wave.sinceChange += 1; if (wave.sinceChange >= 2 && wave.diff < 3) { wave.diff += 1; wave.sinceChange = 0; wave.diffNote = "up"; } }
+      else { wave.sinceChange = 0; if (wave.diff > 1) { wave.diff -= 1; wave.diffNote = "down"; } }
     }
     redraw();
     fx(score >= 60 ? "good" : "bad", xp + bonus);
@@ -326,7 +355,7 @@
         if (e.data.error) { session.tests = { all: false, passed: 0, total: tests.length, rows: tests.map(function(t) { return { args: t.args, expected: t.expected, actual: e.data.error, pass: false }; }) }; redraw(); return; }
         var rows = e.data.rows.map(function(r, i) { return { args: tests[i].args, expected: tests[i].expected, actual: r.actual, pass: r.pass }; }), passed = rows.filter(function(r) { return r.pass; }).length;
         session.tests = { all: passed === rows.length, passed: passed, total: rows.length, rows: rows };
-        if (passed === rows.length) finish(g, 100, "Every test passes, including the edge case. Nice catch on the missing lower bound.");
+        if (passed === rows.length) finish(g, 100, g.successText || "Every test passes, including the edge case. Nice catch on the missing lower bound.");
         else redraw();
       };
       worker.onerror = function() { stop(); ctx.say("Couldn’t run that snippet. Check the syntax."); };
@@ -446,7 +475,8 @@
     if (act === "wave-next") { waveNext(); return; }
     if (act === "wave-retry") { startWave(wave ? wave.level : currentLevel()); return; }
     if (act === "wave-chest") { openWaveChest(); return; }
-    if (act === "replay") { openGame(current); return; }
+    if (act === "replay") { openGame(current, { avoid: round && round.vid }); return; }
+    if (act === "similar") { openGame(current, { avoid: round && round.vid, maxDiff: round && round.difficulty, target: round && round.difficulty }); return; }
     if (act === "continue") { openGame(nextGame()); return; }
     if (act === "visual-select") { selectVisual(actButton.dataset.aiVisual); return; }
     if (act === "visual-step") { stopVisualPlayback(); setVisualStep(Number(actButton.dataset.aiStep)); return; }
@@ -455,7 +485,7 @@
     if (act === "visual-toggle") { toggleVisualPlayback(); return; }
     if (act === "js-continue") { var nextJs = JS_LESSONS.find(function(item) { return !has(jsDone(), item.id); }) || JS_LESSONS[0]; openJsLesson(nextJs.id); return; }
     if (session.result || ctx.view() !== "aigame") return;
-    var g = G[current];
+    var g = cur();
     var evidence = t.closest("[data-ai-evidence]");
     if (evidence) { session.activeCriterion = Number(evidence.dataset.aiEvidence); redraw(); return; }
     var choice = t.closest("[data-ai-choice]");
@@ -469,6 +499,8 @@
     }
     var card = t.closest("[data-ai-item]");
     if (card) { var id = card.dataset.aiItem; session.items = has(session.items, id) ? session.items.filter(function(x) { return x !== id; }) : session.items.concat([id]); redraw(); return; }
+    var scopePick = t.closest("[data-ai-scopepick]");
+    if (scopePick) { session.scope = scopePick.dataset.aiScopepick === "yes"; session.scopeTouched = true; redraw(); return; }
     var verdict = t.closest("[data-ai-verdict]");
     if (verdict) { session.verdicts[verdict.dataset.aiVerdict] = verdict.dataset.aiValue; redraw(); return; }
     var review = t.closest("[data-ai-review]");
@@ -492,7 +524,7 @@
     attach: function(hostContext) { ctx = hostContext; },
     label: function(v) {
       if (v === "aimap") return "Game Map · AI Code Check";
-      if (v === "aigame") return G[current] ? G[current].title : "AI Code Check";
+      if (v === "aigame") return G[current] ? cur().title : "AI Code Check";
       if (v === "jstrail") return "Animated · JavaScript Trail";
       if (v === "jscinema") return "Animated · JS Code Cinema";
       return "Animated · Pip’s Code Explainers";
