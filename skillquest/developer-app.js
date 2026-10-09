@@ -17,7 +17,7 @@
     { speaker: "Leo · Teammate", text: "In the meeting, Leo presents your idea as his own. Afterwards he looks a bit awkward. How do you respond?", options: ["Talk to Leo privately: “I noticed the idea was mine. Can we credit it properly next time?”", "Say nothing and stay annoyed.", "Correct him loudly in front of the team."], points: [2, 0, 1], feedback: ["Nice. You were direct, kind, and focused on the next step.", "Silent resentment tends to grow and hurts the working relationship.", "Being direct is good, but a public correction can make people defensive. Try it privately first."] },
     { speaker: "Pip 🦊 · Client call", text: "A client is upset about a missed deadline and starts raising their voice. What happens first?", options: ["Stay calm, acknowledge their frustration, and say what you’ll do next.", "Explain all the reasons it wasn’t your fault.", "End the call until they calm down."], points: [2, 1, 0], feedback: ["Yes. Acknowledging feelings first lowers the temperature, and a clear next step rebuilds trust.", "Explanations can sound like excuses before the person feels heard.", "Ending the call can make a bad moment worse. Stay steady and keep it constructive."] }
   ];
-  function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) } }; }
+  function sortLabOf(x) { return { bubble: { done: !!(x && x.bubble && x.bubble.done) }, binary: { done: !!(x && x.binary && x.binary.done) } }; }
   var AVATAR_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
   function fresh() { return { choice: null, lines: [], order: [], pairs: {}, pending: null, fill: [], code: "", busy: false, stage: "play", lv: 0, seen: [0], ls: 0, result: null }; }
   function zeroSkills() { var o = {}; SKILLS.concat(TECH).forEach(function(k) { o[k.id] = 0; }); return o; }
@@ -265,14 +265,17 @@
     else if (view === "stats") { label.textContent = "Scoreboard"; stats(); }
     else if (view === "lab") { label.textContent = "Play Lab"; labHome(); }
     else if (view === "anim") { label.textContent = "Animated"; animatedPage(); }
-    else if (view === "sort") { label.textContent = "Animated · DSA"; sortPage(); }
+    else if (view === "dsa") { label.textContent = "Animated · DSA"; dsaPage(); }
+    else if (view === "sort") { label.textContent = "Animated · DSA · Bubble Sort"; sortPage(); }
+    else if (view === "search") { label.textContent = "Animated · DSA · Binary Search"; searchPage(); }
     else if (view === "daily") { label.textContent = "Daily quest"; dailyPage(); }
     else if (view === "reels") { label.textContent = "Knowledge reels"; reelsPage(); }
     else if (view === "sim") { label.textContent = "Workplace simulator"; simulatorPage(); }
     else if (view === "badges") { label.textContent = "Badge shelf"; badgesPage(); }
     else { label.textContent = (SCEN_BY_ID[current] || CHAL_BY_ID[current] || { title: "Scenario" }).title; gameScreen(); }
-    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && view === "sort")); });
+    document.querySelectorAll(".nav-item").forEach(function(b) { b.classList.toggle("is-active", b.dataset.nav === view || ((view === "game" || view === "techskill") && b.dataset.nav === "map") || (b.dataset.nav === "lab" && ["daily", "reels", "sim", "badges"].indexOf(view) >= 0) || (b.dataset.nav === "anim" && ["dsa", "sort", "search"].indexOf(view) >= 0)); });
     if (view === "sort") mountSortLab(); else if (window.SkillQuestBubbleSort) window.SkillQuestBubbleSort.unmount();
+    if (view === "search") mountSearchLab(); else if (window.XPBinarySearch) window.XPBinarySearch.unmount();
     syncAccountUi();
     var sound = document.querySelector("[data-action='sound']");
     if (sound) { sound.textContent = state.sound ? "🔊 Sound on" : "🔈 Sound off"; sound.setAttribute("aria-pressed", String(state.sound)); }
@@ -350,16 +353,36 @@
       moduleCard("daily", "🗓️", "Daily Quest", "FRESH EACH DAY", "A small mission, a quick reel, and one story decision.", dailyCount() + "/3 complete") +
       '</div><section class="lab-footer-tip"><span>💡</span><p><b>Little and often wins.</b> These side quests are short on purpose. Come back tomorrow for a fresh daily checklist.</p></section>';
   }
-  var ANIMATED = [
-    { view: "sort", icon: "🧮", name: "DSA", tag: "DATA STRUCTURES & ALGORITHMS", desc: "Step through classic algorithms with the real code beside the animation.", status: function() { return state.sortLab.bubble.done ? "Bubble Sort · Completed ✓" : "Bubble Sort · +40 XP"; } }
+  var ALGOS = [
+    { view: "sort", icon: "🫧", title: "Bubble Sort", tag: "SORTING · O(n²)", desc: "Watch neighbours compare and swap while the real code lights up beside them.", done: function() { return state.sortLab.bubble.done; } },
+    { view: "search", icon: "🔎", title: "Binary Search", tag: "SEARCHING · O(log n)", desc: "Halve a sorted list again and again until the target is found, one step at a time.", done: function() { return state.sortLab.binary.done; } }
   ];
+  function algosDone() { return ALGOS.filter(function(a) { return a.done(); }).length; }
   function animatedPage() {
     root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">SEE IT MOVE</span><h1>Animated 🎞️</h1><p>Interactive walkthroughs you can play, pause, and step through at your own pace.</p></div></section>' +
-      '<div class="lab-module-grid">' + ANIMATED.map(function(c) { return moduleCard(c.view, c.icon, c.name, c.tag, c.desc, c.status()); }).join("") + '</div>' +
+      '<div class="lab-module-grid">' + moduleCard("dsa", "🧮", "DSA", "DATA STRUCTURES & ALGORITHMS", "Step through classic algorithms with the real code beside the animation.", algosDone() + " of " + ALGOS.length + " completed") + '</div>' +
       '<section class="lab-footer-tip"><span>💡</span><p><b>More topics are on the way.</b> Each one earns XP the first time you watch it all the way through.</p></section>';
   }
+  function dsaPage() {
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED</span><h1>DSA 🧮</h1><p>Pick an algorithm and watch it work. Each one earns +40 XP the first time you finish it.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section>' +
+      '<div class="lab-module-grid">' + ALGOS.map(function(a) { return moduleCard(a.view, a.icon, a.title, a.tag, a.desc, a.done() ? "Completed ✓" : "Start · +40 XP"); }).join("") + '</div>';
+  }
+  function searchPage() {
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Binary Search 🔎</h1><p>Pick a target, then step through or play. Finish one search to earn XP and the Search Savant badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="binary-search-host"></div>';
+  }
+  function mountSearchLab() {
+    var host = document.getElementById("binary-search-host");
+    if (!host || !window.XPBinarySearch) { if (host) host.textContent = "The visualizer could not load. Refresh the page to try again."; return; }
+    window.XPBinarySearch.mount(host, { alreadyDone: state.sortLab.binary.done, onComplete: completeBinarySearch });
+  }
+  function completeBinarySearch(result) {
+    if (state.sortLab.binary.done) return { message: "✓ Search Savant badge earned — replay any time for practice." };
+    state.sortLab.binary.done = true; state.xp += 40; save();
+    say("Binary Search complete! +40 XP");
+    return { message: "🎉 " + (result.found ? "Found it" : "Ruled it out") + " in " + result.steps + " step" + (result.steps === 1 ? "" : "s") + ". +40 XP and the Search Savant badge!" };
+  }
   function sortPage() {
-    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>DSA 🧮 <small>Bubble Sort</small></h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="anim">← Animated</button></section><div id="bubble-sort-host"></div>';
+    root.innerHTML = '<section class="dev-page-title"><div><span class="dev-eyebrow">ANIMATED · DSA · +40 XP</span><h1>Bubble Sort 🫧</h1><p>Play it, pause it, step through it. Watch every step once to earn XP and the Sort Sprinter badge.</p></div><button class="dev-link" data-nav="dsa">← DSA</button></section><div id="bubble-sort-host"></div>';
   }
   function mountSortLab() {
     var host = document.getElementById("bubble-sort-host");
@@ -408,6 +431,7 @@
       { icon: '🌱', title: 'Rising Skill', desc: 'Reach Level 2 in any skill.', unlocked: anySkill },
       { icon: '📼', title: 'Pocket Professor', desc: 'Collect all three Knowledge Reels.', unlocked: state.reels.length >= REELS.length },
       { icon: '🎭', title: 'Calm in the Chaos', desc: 'Finish the workplace simulator.', unlocked: state.simulator.done },
+      { icon: '🔎', title: 'Search Savant', desc: 'Finish a Binary Search.', unlocked: state.sortLab.binary.done },
       { icon: '🫧', title: 'Sort Sprinter', desc: 'Watch the whole Bubble Sort Lab.', unlocked: state.sortLab.bubble.done },
       { icon: '🎁', title: 'Daily Dynamo', desc: 'Claim the daily quest reward.', unlocked: state.daily.claimed }
     ];
