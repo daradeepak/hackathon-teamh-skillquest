@@ -17,7 +17,7 @@ No npm packages are needed. Choose **Sign in / create account** to make a local 
 - Leaderboard (sidebar) ranks registered players by XP and highlights you. Scoreboard keeps your personal stats.
 - Profile: click your avatar to edit your display name and upload a photo (resized in the browser, saved to your account, or kept on this device as a guest).
 - Light/Dark theme switch in the top bar; the choice is remembered.
-- Play Lab with the Bubble Sort visualizer is hidden for now. Its code stays behind `LAB_ENABLED` in `developer-app.js` with no link in the UI.
+- Animated (sidebar) holds animated walkthroughs. DSA → Bubble Sort is a 3D step-by-step visualizer with play, pause, step, scrub, speed control and custom arrays. Watching every step earns +40 XP and the Sort Sprinter badge once.
 - XP, player levels, a scoreboard, and a sound toggle.
 - Local account registration, sign-in, sign-out, password hashing, and server-backed progress saving.
 - The older lab (daily quest, reels, story and badges; temporarily hidden; set `LAB_ENABLED = true` in `developer-app.js` and restore its sidebar button and home banner to bring it back) adds a daily three-part quest, three flip-to-reveal Knowledge Reels with quick checks, a branching workplace story, and an unlockable badge shelf.
