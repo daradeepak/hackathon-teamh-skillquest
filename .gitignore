@@ -11,3 +11,5 @@ skillquest/data/*.tmp
 .DS_Store
 node_modules/
 .vercel/
+skillquest/dist/
+skillquest/.netlify/
