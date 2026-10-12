@@ -28,9 +28,12 @@ const MIGRATIONS = [
 ];
 
 function createPool(connectionString) {
-  if (!connectionString) throw new Error("DATABASE_URL is not set. Copy .env.example to .env and point it at your PostgreSQL database.");
-  const ssl = process.env.DATABASE_SSL === "require" ? { rejectUnauthorized: true } : (process.env.DATABASE_SSL === "no-verify" ? { rejectUnauthorized: false } : undefined);
-  const pool = new Pool({ connectionString, ssl, max: Number(process.env.DATABASE_POOL_SIZE) || 10, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+  const resolvedConnectionString = connectionString || process.env.DATABASE_URL || process.env.NETLIFY_DB_URL || process.env.NETLIFY_DATABASE_URL;
+  if (!resolvedConnectionString) throw new Error("Set DATABASE_URL or connect a Netlify PostgreSQL database.");
+  const netlifyConnection = resolvedConnectionString === process.env.NETLIFY_DB_URL || resolvedConnectionString === process.env.NETLIFY_DATABASE_URL;
+  const ssl = process.env.DATABASE_SSL === "require" ? { rejectUnauthorized: true } : (process.env.DATABASE_SSL === "no-verify" ? { rejectUnauthorized: false } : ((netlifyConnection || process.env.NETLIFY) ? { rejectUnauthorized: true } : undefined));
+  const defaultPoolSize = process.env.NETLIFY ? 2 : 10;
+  const pool = new Pool({ connectionString: resolvedConnectionString, ssl, max: Number(process.env.DATABASE_POOL_SIZE) || defaultPoolSize, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
   pool.on("error", error => console.error(new Date().toISOString(), "database pool error", error.message));
   return pool;
 }
